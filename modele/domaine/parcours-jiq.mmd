@@ -1,0 +1,27 @@
+%% Event Storming Big Picture, section 3 : parcours au stand le 2026-11-18
+%% Orange : événement ; bleu : commande ; jaune : acteur ; rose : point chaud
+flowchart LR
+    classDef ev fill:#FFD3A8,stroke:#C98A4B,color:#000
+    classDef cmd fill:#A8DAFF,stroke:#4B8AC9,color:#000
+    classDef act fill:#FFE299,stroke:#C9A84B,color:#000
+    classDef hot fill:#FFA8DB,stroke:#C94B8A,color:#000
+
+    V([Visiteur de la JIQ]):::act --> E1[Le visiteur a aperçu le mur depuis l'allée]:::ev
+    E1 --> E2[Le visiteur s'est arrêté devant le mur]:::ev
+    E2 --> C1[/Scanner le QR code/]:::cmd
+    C1 --> E3[Le site s'est ouvert sur son téléphone]:::ev
+    E3 --> C2[/Parcourir les 50 ans/]:::cmd
+    C2 --> E4[Le visiteur s'est reconnu dans une époque]:::ev
+    E4 --> E5[Le lien a été gardé ou partagé après la JIQ]:::ev
+
+    B([Bénévole du stand]):::act --> C3[/Lancer la présentation sur le portable/]:::cmd
+    C3 --> E6[La présentation tourne en boucle sur le mur]:::ev
+    E6 --> C4[/Mettre en pause pour une démonstration/]:::cmd
+    C4 --> E7[La boucle a repris seule]:::ev
+    E7 --> E6
+    E6 -.-> E1
+
+    H1{{Support réel inconnu, action 5}}:::hot -.- C3
+    H2{{Mur inconnu, conçu en 32:9, action 6}}:::hot -.- E6
+    H3{{Wi-Fi fiable pour le QR code ?}}:::hot -.- C1
+    H4{{Pause obligatoire, WCAG 2.2 critère 2.2.2}}:::hot -.- C4
