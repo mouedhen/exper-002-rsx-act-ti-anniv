@@ -1,0 +1,19 @@
+{
+  "name": "prototypes-concepts-jiq-50",
+  "private": true,
+  "version": "0.1.0",
+  "type": "module",
+  "description": "Prototypes jetables de l'étape 4 (concepts), expérience 002",
+  "scripts": {
+    "dev": "vite",
+    "build": "vite build",
+    "preview": "vite preview"
+  },
+  "devDependencies": {
+    "vite": "8.3.2"
+  },
+  "dependencies": {
+    "motion": "14.0.0",
+    "animejs": "4.5.0"
+  }
+}
