@@ -1,11 +1,11 @@
 // Captures du concept A : mur (1920 × 540), formulaire (360 × 780), vidéo de 15 s du mur.
-// Prérequis : `npx vite --port 5174 --strictPort` lancé depuis prototypes/.
+// Prérequis : `npx vite --port 5191 --strictPort` lancé depuis prototypes/.
 // Usage : node concept-a/capture.cjs
 const fs = require('fs')
 const path = require('path')
 const { chromium } = require('/opt/node22/lib/node_modules/playwright')
 
-const URL = 'http://localhost:5174/concept-a/'
+const URL = 'http://localhost:5191/concept-a/'
 const SORTIE = '/mnt/project-files/exp-002/etape-4/captures'
 const pause = (ms) => new Promise((r) => setTimeout(r, ms))
 const erreurs = []
@@ -17,7 +17,7 @@ function surveiller(page, nom) {
   page.on('pageerror', (e) => erreurs.push(`[${nom}] pageerror: ${e.message}`))
   page.on('requestfailed', (r) => erreurs.push(`[${nom}] requête échouée: ${r.url()}`))
   page.on('request', (r) => {
-    if (!r.url().startsWith('http://localhost:5174/')) erreurs.push(`[${nom}] requête externe: ${r.url()}`)
+    if (!r.url().startsWith('http://localhost:5191/')) erreurs.push(`[${nom}] requête externe: ${r.url()}`)
   })
 }
 
@@ -27,6 +27,7 @@ function surveiller(page, nom) {
   const cap = (page, nom) => page.screenshot({ path: path.join(SORTIE, `concept-a-${nom}.png`) })
 
   // 1. Vidéo du mur, depuis le début de la boucle (horizon puis rembobinage).
+  fs.mkdirSync('/tmp/claude-0', { recursive: true })
   const dossierVideo = fs.mkdtempSync('/tmp/claude-0/concept-a-video-')
   const ctxV = await navigateur.newContext({ viewport: { width: 1920, height: 540 }, recordVideo: { dir: dossierVideo, size: { width: 1920, height: 540 } } })
   const pv = await ctxV.newPage()
@@ -95,15 +96,85 @@ function surveiller(page, nom) {
   await cap(mur, 'mur-8-contribution-demo')
   await pause(5000)
   await cap(mur, 'mur-9-contribution-rangee')
+
+  // Retrait (constat A-1) : une phrase retirée ne doit plus jamais revenir en vedette.
+  const essaiRetrait = async (phrase, attenteAvantRetrait, nomCapture) => {
+    await tel.getByRole('button', { name: 'Écrire un autre souhait' }).click().catch(() => {})
+    if (!(await tel.getByLabel('Rayonner au Canada').isVisible())) await tel.goto(URL + '?vue=formulaire')
+    await tel.getByLabel('Rayonner au Canada').check()
+    await tel.getByLabel(/Un mot pour 2046/).fill(phrase)
+    await tel.getByLabel(/J’accepte/).check()
+    await tel.getByLabel(/14 ans ou plus/).check()
+    await tel.getByRole('button', { name: 'Envoyer au mur' }).click()
+    await tel.getByRole('button', { name: /Simuler l’approbation/ }).click()
+    await pause(attenteAvantRetrait)
+    const avant = await mur.locator('#vedette').innerText()
+    await tel.getByRole('button', { name: 'Retirer ma contribution' }).click()
+    await pause(300)
+    if (nomCapture) await cap(mur, nomCapture)
+    // Pendant 24 s (plus que les quatre vedettes de la scène), la phrase ne doit apparaître nulle part.
+    let vue = 0
+    for (let i = 0; i < 96; i++) {
+      if ((await mur.locator('#stage').innerText()).includes(phrase)) vue++
+      await pause(250)
+    }
+    console.log(`Retrait à ${attenteAvantRetrait / 1000} s (vedette ${avant.includes(phrase) ? 'affichée' : 'pas encore affichée'} au retrait) : phrase revue ${vue} fois en 24 s → ${vue === 0 ? 'OK' : 'ÉCHEC'}`)
+  }
+  await essaiRetrait('PHRASE-RETIREE-A', 1000) // le cas de l'équipe rouge : retrait 1 s après l'approbation
+  await essaiRetrait('PHRASE-RETIREE-B', 6500, 'mur-11-retrait-pendant-vedette') // retrait pendant la vedette
   await ctx.close()
+
+  // Compteurs (constat A-3, WCAG 2.3.1) : au plus 3 changements de chiffres par seconde, rembobinage et vedettes.
+  const ctxC = await navigateur.newContext({ viewport: { width: 1920, height: 540 } })
+  const pc = await ctxC.newPage()
+  surveiller(pc, 'compteurs')
+  await pc.goto(URL)
+  await pc.waitForSelector('#total')
+  await pc.evaluate(() => {
+    window.__changements = {}
+    for (const id of ['compteur-annee', 'tete-annee', 'total']) {
+      const n = document.getElementById(id)
+      window.__changements[id] = []
+      new MutationObserver(() => window.__changements[id].push(performance.now())).observe(n, { childList: true, characterData: true, subtree: true })
+    }
+  })
+  await pause(19000) // horizon et rembobinage complet
+  await pc.getByRole('button', { name: /Scène 2/ }).click()
+  await pause(17000) // trois vedettes
+  const ch = await pc.evaluate(() => window.__changements)
+  for (const [id, ts] of Object.entries(ch)) {
+    let max = 0
+    for (let i = 0; i < ts.length; i++) max = Math.max(max, ts.filter((t) => t >= ts[i] && t < ts[i] + 1000).length)
+    console.log(`#${id} : ${ts.length} changements en 36 s, au plus ${max} dans une fenêtre de 1 s → ${max <= 3 ? 'OK' : 'ÉCHEC'}`)
+  }
+  await ctxC.close()
 
   // 4. Mouvement réduit : états fixes.
   const ctxR = await navigateur.newContext({ viewport: { width: 1920, height: 540 }, reducedMotion: 'reduce' })
   const pr = await ctxR.newPage()
   surveiller(pr, 'reduit')
+  // Positions (constat A-2) : en mouvement réduit, rien ne doit se déplacer entre deux relevés.
+  const boite = (sel) => pr.evaluate((s) => { const r = document.querySelector(s).getBoundingClientRect(); return [r.x, r.y, r.width, r.height].map((v) => Math.round(v * 2) / 2).join(',') }, sel)
+  const immobile = async (sel, t1, t2, depart) => {
+    await pause(t1 - (Date.now() - depart))
+    const a = await boite(sel)
+    await pause(t2 - (Date.now() - depart))
+    const b = await boite(sel)
+    console.log(`Mouvement réduit, ${sel} entre ${t1 / 1000} et ${t2 / 1000} s : ${a === b ? 'immobile → OK' : `déplacé (${a} → ${b}) → ÉCHEC`}`)
+  }
+  let depart = Date.now()
   await pr.goto(URL)
-  await pause(10000)
+  await immobile('.carte-horizon', 620, 1540, depart)
+  await immobile('#cerf', 1800, 2600, depart)
+  await pause(10000 - (Date.now() - depart))
   await cap(pr, 'mur-10-mouvement-reduit')
+  depart = Date.now()
+  await pr.goto(URL + '?scene=2')
+  await immobile('#releve', 1850, 2500, depart)
+  await immobile('.point', 3050, 4080, depart)
+  // La vedette : relevés 0,1 s puis 0,9 s après son apparition (elle reste 4,7 s).
+  await pr.waitForFunction(() => getComputedStyle(document.getElementById('vedette')).opacity === '1', null, { timeout: 15000 })
+  await immobile('#vedette', 100, 900, Date.now())
   await ctxR.close()
 
   // 5. Formulaire en anglais.

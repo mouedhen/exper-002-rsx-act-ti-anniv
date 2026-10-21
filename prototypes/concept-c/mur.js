@@ -60,7 +60,7 @@ function gabarit() {
       <div class="epoque epoque-web" id="scene2" data-scene="2">
         <header class="bandeau"><h2>${esc(SCENE_2.titre)}</h2><p>Décor stylisé : aucune page d'époque reproduite. Les faits, eux, sont sourcés.</p></header>
         <div class="fenetre">
-          <div class="barre-titre"><span>Chronologie 1991-2008 · navigateur</span><span class="cases" aria-hidden="true"><i></i><i></i><i></i></span></div>
+          <div class="barre-titre"><span>Chronologie 1991-2008 · navigateur</span></div>
           <div class="barre-outils" aria-hidden="true"><span class="relief">Précédent</span><span class="relief">Suivant</span><span class="relief">Recharger</span><span class="adresse">Adresse : décor stylisé</span></div>
           <div class="page">
             <h3 class="nom" data-fait="F-016">Le nom, en 2008 : <span class="morph"></span><span class="curseur-web" aria-hidden="true"></span></h3>
@@ -78,7 +78,7 @@ function gabarit() {
       </div>
     </section>
     <aside class="aujourdhui">
-      <header><p class="surtitre">Aujourd'hui · 2026</p><h2>Vos mots arrivent ici</h2></header>
+      <header><p class="surtitre">Aujourd'hui · 2026 <span class="non-officiel-mur">Proposition non officielle · prototype</span></p><h2>Vos mots arrivent ici</h2></header>
       <div class="cartes-faits">${cartes}</div>
       <div class="fil">
         <h3>Le fil du public <span class="mod">modéré avant affichage</span></h3>
@@ -95,6 +95,7 @@ function gabarit() {
   <button type="button" id="btn-pause" aria-pressed="false">Pause <kbd>espace</kbd></button>
   <button type="button" class="btn-scene" data-aller="scene1" aria-pressed="true">Scène 1 · 1976-1986</button>
   <button type="button" class="btn-scene" data-aller="scene2" aria-pressed="false">Scène 2 · 1991-2008</button>
+  <button type="button" id="btn-vue" aria-live="polite">Vue : mur entier</button>
   <a href="?vue=formulaire" target="_blank" rel="noopener" id="lien-form">Formulaire (téléphone)</a>
   <span class="indic" id="indic" role="status"></span>
 </div>`,
@@ -138,12 +139,26 @@ export function monterMur(app) {
   dessinerQR(document.getElementById('qr'))
 
   // Mise à l'échelle du 7680 × 2160 dans la fenêtre.
+  // Itération 2 (C-7) : deux vues recadrées pour le portable de démo (1366 px) : les époques (0-5120 px)
+  // ou l'interface d'aujourd'hui (5120-7680 px), agrandies 1,5 et 2 fois par rapport au mur entier.
+  const VUES = [
+    { nom: 'mur', libelle: 'Vue : mur entier', x0: 0, w: LARGEUR },
+    { nom: 'epoques', libelle: 'Vue : époques (recadrée)', x0: 0, w: 5120 },
+    { nom: 'aujourdhui', libelle: "Vue : aujourd'hui (recadrée)", x0: 5120, w: 2560 },
+  ]
+  const btnVue = document.getElementById('btn-vue')
+  let vue = Math.max(0, VUES.findIndex((v) => v.nom === new URLSearchParams(location.search).get('recadre')))
   let echelle = 1
   const ajuster = () => {
-    echelle = Math.min(innerWidth / LARGEUR, innerHeight / HAUTEUR)
-    mur.style.transform = `translate(-50%, -50%) scale(${echelle})`
+    const v = VUES[vue]
+    echelle = Math.min(innerWidth / v.w, innerHeight / HAUTEUR)
+    const dx = (LARGEUR / 2 - (v.x0 + v.w / 2)) * echelle
+    mur.style.transform = `translate(-50%, -50%) translateX(${dx}px) scale(${echelle})`
+    btnVue.textContent = v.libelle
+    document.body.dataset.vue = v.nom
   }
   addEventListener('resize', ajuster)
+  btnVue.addEventListener('click', () => { vue = (vue + 1) % VUES.length; ajuster() })
   ajuster()
 
   // ---------- État piloté par le fil de temps ----------
@@ -185,6 +200,9 @@ export function monterMur(app) {
 
   // ---------- Le fil de temps (anime.js) ----------
   const d = (ms) => (reduit ? 1 : ms)
+  // Itération 2 (C-8) : en mouvement réduit, le passage terminal → page reste un fondu de 600 ms,
+  // pas une coupe franche (pas de déplacement : seule l'opacité change).
+  const FONDU = reduit ? 600 : 1600
   const tl = createTimeline({ loop: true, autoplay: false, onUpdate: rendu })
   tl.label('scene1', 0)
   tl.add(etat, { o1: [1, 1], o2: [0, 0], s1: [0, 0], s2: [0, 0], charge: [0, 0], morph: [0, 0], duration: 1 }, 0)
@@ -197,29 +215,32 @@ export function monterMur(app) {
   tl.label('scene2', DEBUT_SCENE_2)
   // Remise à zéro explicite de la page web juste avant son apparition (la boucle ne la garantit pas).
   tl.add(etat, { s2: [0, 0], charge: [0, 0], morph: [0, 0], duration: 1 }, DEBUT_SCENE_2 - 20)
-  tl.add(etat, { o1: [1, 0], o2: [0, 1], duration: d(1600), ease: 'inOutSine' }, DEBUT_SCENE_2)
-  tl.add(etat, { s1: [total1, 0], duration: 1 }, DEBUT_SCENE_2 + d(1600) + 2)
-  tl.add(etat, { charge: [0, 1], duration: d(2800), ease: 'linear' }, DEBUT_SCENE_2 + (reduit ? 3 : 1600))
+  tl.add(etat, { o1: [1, 0], o2: [0, 1], duration: FONDU, ease: 'inOutSine' }, DEBUT_SCENE_2)
+  tl.add(etat, { s1: [total1, 0], duration: 1 }, DEBUT_SCENE_2 + FONDU + 2)
+  tl.add(etat, { charge: [0, 1], duration: d(2800), ease: 'linear' }, DEBUT_SCENE_2 + (reduit ? FONDU + 3 : 1600))
   lis.forEach((_, k) => {
-    tl.add(etat, { s2: [k, k + 1], duration: 1 }, DEBUT_SCENE_2 + (reduit ? 4 + k : 2000 + k * 1800))
+    tl.add(etat, { s2: [k, k + 1], duration: 1 }, DEBUT_SCENE_2 + (reduit ? FONDU + 4 + k : 2000 + k * 1800))
   })
-  tl.add(etat, { morph: [0, totalMorph], duration: d(Math.round(totalMorph / CPS * 1.4)), ease: 'linear' }, DEBUT_SCENE_2 + (reduit ? 12 : 12500))
-  tl.add(etat, { o1: [0, 1], o2: [1, 0], duration: d(1600), ease: 'inOutSine' }, FIN_BOUCLE)
-  tl.add(etat, { s2: [lis.length, 0], charge: [1, 0], morph: [totalMorph, 0], duration: 1 }, FIN_BOUCLE + d(1600) + 2)
+  tl.add(etat, { morph: [0, totalMorph], duration: d(Math.round(totalMorph / CPS * 1.4)), ease: 'linear' }, DEBUT_SCENE_2 + (reduit ? FONDU + 12 : 12500))
+  tl.add(etat, { o1: [0, 1], o2: [1, 0], duration: FONDU, ease: 'inOutSine' }, FIN_BOUCLE)
+  tl.add(etat, { s2: [lis.length, 0], charge: [1, 0], morph: [totalMorph, 0], duration: 1 }, FIN_BOUCLE + FONDU + 2)
 
   // ---------- Pause (WCAG 2.2.2) ----------
   let enPause = false
   const actives = new Set()
+  let file = [] // contributions approuvées reçues pendant la pause (C-6)
   function majPause() {
     btnPause.innerHTML = enPause ? 'Reprendre <kbd>espace</kbd>' : 'Pause <kbd>espace</kbd>'
     btnPause.setAttribute('aria-pressed', String(enPause))
     document.body.classList.toggle('en-pause', enPause)
-    indic.textContent = (enPause ? 'En pause. ' : '') + (reduit ? 'Mouvement réduit : textes affichés d\'un bloc.' : '')
+    const n = file.length
+    indic.textContent = (enPause ? 'En pause. ' : '') + (enPause && n ? `${n} contribution${n > 1 ? 's' : ''} approuvée${n > 1 ? 's' : ''} attend${n > 1 ? 'ent' : ''} la reprise. ` : '') + (reduit ? 'Mouvement réduit : textes affichés d\'un bloc.' : '')
   }
   function basculer() {
     enPause = !enPause
     if (enPause) { tl.pause(); actives.forEach((a) => a.pause()) } else { tl.resume(); actives.forEach((a) => a.play()) }
     majPause()
+    if (!enPause) viderFile()
   }
   btnPause.addEventListener('click', basculer)
   addEventListener('keydown', (e) => {
@@ -230,7 +251,7 @@ export function monterMur(app) {
     basculer()
   })
   btnsScene.forEach((b) => b.addEventListener('click', () => {
-    tl.seek(tl.labels[b.dataset.aller] + (b.dataset.aller === 'scene2' ? d(1600) : 0))
+    tl.seek(tl.labels[b.dataset.aller] + (b.dataset.aller === 'scene2' ? FONDU : 0))
     rendu()
   }))
   majPause()
@@ -238,6 +259,8 @@ export function monterMur(app) {
   // ---------- Contributions (Motion) ----------
   const liste = document.getElementById('liste-contrib')
   const contributions = []
+  // Itération 2 (C-1) : chaque voyage en cours est gardé par identifiant pour pouvoir l'annuler au retrait.
+  const voyages = new Map()
 
   function carte(c) {
     const li = document.createElement('li')
@@ -245,7 +268,7 @@ export function monterMur(app) {
     li.dataset.id = c.id
     li.dataset.simule = c.simule
     const badge = c.simule === 'exemple' ? 'Exemple simulé' : 'Contribution de démo, simulée · effacée après la démo'
-    li.innerHTML = `<p class="genre">${esc(c.genre)}</p><p class="texte">« ${esc(c.texte)} »</p><p class="meta"><span class="sign">${esc(c.signature || 'Anonyme')}</span><span class="badge">${badge}</span></p>`
+    li.innerHTML = `<p class="genre">${esc(c.genre)}</p><p class="texte">« ${esc(c.texte)} »</p><p class="meta"><span class="sign">${esc(c.signature || 'un visiteur')}</span><span class="badge">${badge}</span></p>`
     return li
   }
 
@@ -254,7 +277,7 @@ export function monterMur(app) {
       const z = document.getElementById(id)
       z.querySelector('.public-texte').textContent = c ? `« ${c.texte} »` : 'à écrire'
       z.querySelector('.public-meta').textContent = c
-        ? `— ${c.signature || 'Anonyme'} · ${c.genre} · ${c.simule === 'exemple' ? 'exemple simulé' : 'contribution de démo, simulée'} · écrit en 2026, décor ${decor}`
+        ? `— ${c.signature || 'un visiteur'} · ${c.genre} · ${c.simule === 'exemple' ? 'exemple simulé' : 'contribution de démo, simulée'} · écrit en 2026, décor ${decor}`
         : ''
       z.dataset.contribution = c ? c.id : ''
     }
@@ -312,12 +335,16 @@ export function monterMur(app) {
     voyageur.style.width = `${r0.w}px`
     mur.appendChild(voyageur)
     const r1 = rectMur(cible)
+    const voyage = { annule: false, voyageur, cible, anims: [] }
+    voyages.set(c.id, voyage)
     const seq = suivre(animate([
       [voyageur, { x: [r0.x, r0.x], y: [r0.y, r0.y], opacity: [0, 1] }, { duration: 0.3, at: 1.4 }],
       [voyageur, { x: [r0.x, r1.x], y: [r0.y, r1.y], width: [r0.w, Math.min(r1.w, 4200)] }, { type: 'spring', stiffness: 40, damping: 14, at: 2.0 }],
       [cible, { opacity: [1, 0] }, { duration: 0.4, at: '<' }],
     ]))
+    voyage.anims.push(seq)
     seq.finished.then(() => {
+      if (voyage.annule) return
       cible.textContent = nouveauTexte
       meta.textContent = nouvelleMeta
       zone.classList.add('recue')
@@ -325,11 +352,24 @@ export function monterMur(app) {
         [voyageur, { opacity: [1, 0] }, { duration: 0.6 }],
         [cible, { opacity: [0, 1] }, { duration: 0.6, at: '<' }],
       ]))
-      fin.finished.then(() => voyageur.remove())
+      voyage.anims.push(fin)
+      fin.finished.then(() => { voyageur.remove(); voyages.delete(c.id) })
     })
   }
 
   function retirer(id) {
+    // Une phrase encore en file d'attente (pause) est simplement oubliée (C-6).
+    const j = file.findIndex((m) => String(m.id) === id)
+    if (j >= 0) { file.splice(j, 1); majPause() }
+    // Un voyage en cours est arrêté, sans écrire la phrase dans le décor (C-1).
+    const v = voyages.get(id)
+    if (v) {
+      v.annule = true
+      v.anims.forEach((a) => { a.stop(); actives.delete(a) })
+      v.voyageur.remove()
+      v.cible.style.opacity = 1
+      voyages.delete(id)
+    }
     const i = contributions.findIndex((c) => c.id === id)
     if (i < 0) return
     contributions.splice(i, 1)
@@ -341,10 +381,23 @@ export function monterMur(app) {
 
   ;[...EXEMPLES_SIMULES].reverse().forEach((c) => ajouter(c, { anime: false }))
 
+  // Itération 2 (C-6) : une contribution reçue pendant la pause attend la reprise ; le mur reste figé.
+  // Un retrait, lui, s'applique tout de suite, même en pause : retirer prime sur figer.
+  function recevoirAjout(msg) {
+    ajouter({ id: String(msg.id), genre: String(msg.genre).slice(0, 60), texte: msg.texte.slice(0, 140), signature: String(msg.signature || '').slice(0, 30), simule: 'demo' })
+  }
+  function viderFile() {
+    const a = file
+    file = []
+    majPause()
+    a.forEach(recevoirAjout)
+  }
+
   ouvrirCanal((msg) => {
     if (!msg || typeof msg !== 'object') return
     if (msg.type === 'ajout' && typeof msg.texte === 'string') {
-      ajouter({ id: String(msg.id), genre: String(msg.genre).slice(0, 60), texte: msg.texte.slice(0, 140), signature: String(msg.signature || '').slice(0, 30), simule: 'demo' })
+      if (enPause) { file.push(msg); majPause(); return }
+      recevoirAjout(msg)
     } else if (msg.type === 'retrait') {
       retirer(String(msg.id))
     }
@@ -353,5 +406,5 @@ export function monterMur(app) {
   rendu()
   tl.play()
   if (reduit) indic.textContent = 'Mouvement réduit : textes affichés d\'un bloc.'
-  window.__murC = { tl, etat } // pour les captures
+  window.__murC = { tl, etat, file: () => file.length, contributions: () => contributions.map((c) => c.id) } // pour les captures
 }

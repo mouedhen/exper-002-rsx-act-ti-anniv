@@ -1,9 +1,11 @@
-// Captures du concept B : node capture.cjs (serveur Vite lancé sur le port 5175).
+// Captures et vérifications du concept B : node capture.cjs
+// (serveur lancé depuis prototypes/ : npx vite --port 5192 --strictPort).
+// Itération 2 : cas de test des constats B-1 à B-8 et T-1 (equipe-rouge-1.md).
 const { chromium } = require('/opt/node22/lib/node_modules/playwright')
 const fs = require('node:fs')
 const path = require('node:path')
 
-const BASE = 'http://localhost:5175/concept-b/'
+const BASE = 'http://localhost:5192/concept-b/'
 const SORTIE = '/mnt/project-files/exp-002/etape-4/captures'
 const attendre = (ms) => new Promise((r) => setTimeout(r, ms))
 
@@ -15,7 +17,23 @@ const attendre = (ms) => new Promise((r) => setTimeout(r, ms))
     page.on('console', (m) => { if (m.type() === 'error' || m.type() === 'warning') erreurs.push(`${nom} [${m.type()}] ${m.text()}`) })
     page.on('pageerror', (e) => erreurs.push(`${nom} [pageerror] ${e.message}`))
     page.on('requestfailed', (r) => { if (!/ERR_ABORTED/.test(r.failure()?.errorText || '')) erreurs.push(`${nom} [requête] ${r.url()} ${r.failure()?.errorText}`) })
-    page.on('request', (r) => { if (!r.url().startsWith('http://localhost:5175')) erreurs.push(`${nom} [hors ligne violé] ${r.url()}`) })
+    page.on('request', (r) => { if (!r.url().startsWith('http://localhost:5192')) erreurs.push(`${nom} [hors ligne violé] ${r.url()}`) })
+  }
+
+  const verifs = []
+  const ok = (code, cond, detail) => verifs.push(`${cond ? 'OK   ' : 'ÉCHEC'} ${code} · ${detail}`)
+  const journal = (p) => p.$eval('#journal', (n) => n.textContent)
+  const surMur = (p, txt) => p.evaluate((t) => document.querySelector('.scene').textContent.includes(t), txt)
+  const ouvrirTel = async (ctx, nom) => {
+    const t = await ctx.newPage(); suivre(t, nom)
+    await t.setViewportSize({ width: 360, height: 780 })
+    await t.goto(`${BASE}?vue=formulaire`)
+    return t
+  }
+  const transmettre = async (t, texte) => {
+    await t.fill('#phrase', texte); await t.check('#accord'); await t.check('#age')
+    await t.click('#form button[type="submit"]')
+    return t.$eval('#liste-envois li:last-child .code', (n) => n.textContent)
   }
 
   // 1. Mur, scène 1 (canal Internet, puis canal JIQ), 1920 × 540.
@@ -36,6 +54,39 @@ const attendre = (ms) => new Promise((r) => setTimeout(r, ms))
   await mur.screenshot({ path: path.join(SORTIE, 'concept-b-mur-pause.png') })
   await mur.keyboard.press('Space')
 
+  // B-3 et B-4 : F-002 hors du canal « Au-delà du Québec », date de F-070 exacte.
+  await mur.goto(`${BASE}?canal=rayonnement`); await attendre(8000)
+  const ray = await mur.$$eval('.rang[data-canal="rayonnement"] [data-fait], .carte[data-fait]', (n) => n.map((x) => x.dataset.fait))
+  const d070 = await mur.$eval('.carte[data-fait="F-070"] .carte-date', (n) => n.textContent)
+  ok('B-3', !ray.includes('F-002') && ray.includes('F-070'), `canal Rayonnement : ${[...new Set(ray)].join(', ')}`)
+  ok('B-4', d070.startsWith('depuis 1998 (écrit en 2019-2020)'), `date affichée de F-070 : « ${d070.replace(/ F-070$/, '')} »`)
+  ok('B-3', faits.includes('F-002'), 'F-002 est maintenant dans le canal JIQ (première JIQ)')
+
+  // B-5 : une transmission reçue pendant la pause attend la reprise ; le mur ne bouge pas.
+  await mur.goto(`${BASE}?canal=jiq`); await attendre(3000)
+  await mur.keyboard.press('Space'); await attendre(300)
+  const avant = await mur.screenshot()
+  const entAvant = await mur.$eval('#entete-canal', (n) => n.textContent)
+  const telP = await ouvrirTel(ctx, 'formulaire-pause')
+  await transmettre(telP, 'PHRASE-PAUSE-B')
+  await attendre(2500)
+  await mur.bringToFront()
+  const apres = await mur.screenshot({ path: path.join(SORTIE, 'concept-b-mur-pause.png') })
+  const entApres = await mur.$eval('#entete-canal', (n) => n.textContent)
+  const msgPause = await telP.$eval('#etat', (n) => n.textContent)
+  ok('B-5', Buffer.compare(avant, apres) === 0 && entAvant === entApres, 'mur identique au pixel près 2,5 s après une transmission reçue en pause')
+  ok('B-5', /en pause/.test(msgPause), `le formulaire prévient : « ${msgPause.match(/Le mur est en pause[^.]*/)?.[0]} »`)
+  await mur.keyboard.press('Space'); await attendre(4500)
+  ok('B-5', (await journal(mur)).includes('PHRASE-PAUSE-B'), 'à la reprise, la transmission arrive et s\'affiche')
+  await telP.close()
+
+  // B-6 : rien dans localStorage, rien après rechargement.
+  const ls1 = await mur.evaluate(() => localStorage.length)
+  await mur.reload(); await attendre(1000)
+  const ls2 = await mur.evaluate(() => localStorage.length)
+  const j2 = await journal(mur)
+  ok('B-6', ls1 === 0 && ls2 === 0 && !j2.includes('PHRASE-PAUSE-B'), `localStorage : ${ls1} clé avant et ${ls2} après rechargement ; journal vidé`)
+
   // 2. Scène 2 : une contribution saisie dans le formulaire (2e page, même portable).
   await mur.goto(`${BASE}?scene=2`)
   const tel = await ctx.newPage(); suivre(tel, 'formulaire')
@@ -45,12 +96,47 @@ const attendre = (ms) => new Promise((r) => setTimeout(r, ms))
   await tel.selectOption('#an-avenir', '2041')
   await tel.fill('#phrase', 'Que la JIQ de 2041 se vive aussi en région, en direct.')
   await tel.check('#accord')
+  // B-2 : sans la case d'âge, rien n'est transmis.
+  await tel.click('#form button[type="submit"]')
+  const errAge = await tel.$eval('#erreur', (n) => n.textContent)
+  ok('B-2', /âge/.test(errAge) && !(await journal(mur)).includes('2041'), `case distincte « J'ai 14 ans ou plus » obligatoire : « ${errAge} »`)
+  await tel.check('#age')
+  const texteTel = await tel.$eval('main', (n) => n.textContent)
+  ok('B-8', texteTel.includes('Ne nommez personne') && !texteTel.includes('le moins de personnes'), 'aide : « Ne nommez personne »')
+  ok('T-1', ['Qui recueille', 'Réseau ACTION TI (hypothèse, à confirmer)', 'Pourquoi', 'Combien de temps', 'Comment retirer', 'code de retrait', 'simulés', 'Proposition non officielle · prototype'].every((m) => texteTel.includes(m)), 'avis : qui, pourquoi, combien de temps, comment retirer, simulé, mention non officielle')
   await tel.screenshot({ path: path.join(SORTIE, 'concept-b-formulaire.png'), fullPage: true })
   await tel.click('button[type="submit"]')
   await attendre(5500)
   await tel.screenshot({ path: path.join(SORTIE, 'concept-b-formulaire-envoye.png'), fullPage: true })
   await mur.bringToFront(); await attendre(4000)
   await mur.screenshot({ path: path.join(SORTIE, 'concept-b-mur-scene2.png') })
+  const code1 = await tel.$eval('#liste-envois .code', (n) => n.textContent)
+  ok('T-1', /^B-[A-Z0-9]{4}$/.test(code1), `code de retrait affiché après l'envoi : ${code1}`)
+  ok('T-1', await surMur(mur, 'Proposition non officielle · prototype'), 'mur : « Proposition non officielle · prototype » dans la légende')
+
+  // B-1 : « Retirer ma phrase » retire tout (carte, journal, case, compteur).
+  const phrase1 = 'Que la JIQ de 2041 se vive aussi en région, en direct.'
+  const avantRetrait = await surMur(mur, phrase1)
+  await tel.click('#liste-envois button.retirer'); await attendre(1200)
+  const cases2041 = await mur.$eval('.cp[data-an="2041"]', (n) => n.textContent.trim())
+  ok('B-1', avantRetrait && !(await surMur(mur, phrase1)) && cases2041 === '', `bouton : phrase visible avant, absente après (carte, journal ; case 2041 « ${cases2041} »)`)
+  // Retrait pendant l'arrivée (0,5 s après l'envoi) : la phrase ne doit jamais se poser.
+  const telR = await ouvrirTel(ctx, 'formulaire-course')
+  await transmettre(telR, 'PHRASE-RETIREE-B')
+  await attendre(500); await telR.click('#liste-envois button.retirer'); await attendre(6000)
+  ok('B-1', !(await surMur(mur, 'PHRASE-RETIREE-B')), 'retrait 0,5 s après l\'envoi : rien sur le mur 6 s plus tard')
+  await telR.close()
+  // Retrait plus tard avec le code, depuis une nouvelle page (le téléphone a été fermé).
+  const telC = await ouvrirTel(ctx, 'formulaire-code-1')
+  const code2 = await transmettre(telC, 'PHRASE-CODE-B')
+  await telC.close(); await attendre(5000)
+  const visibleAvant = await surMur(mur, 'PHRASE-CODE-B')
+  const telD = await ouvrirTel(ctx, 'formulaire-code-2')
+  await telD.click('.par-code summary'); await telD.fill('#code', code2.toLowerCase())
+  await telD.click('#form-code button[type="submit"]'); await attendre(1000)
+  const confD = await telD.$eval('#etat-code', (n) => n.textContent)
+  ok('B-1', visibleAvant && !(await surMur(mur, 'PHRASE-CODE-B')) && /confirmé/.test(confD), `code ${code2} saisi sur une nouvelle page : phrase retirée, « ${confD} »`)
+  await telD.close()
   await ctx.close()
 
   // 3. Mouvement réduit (prefers-reduced-motion).
@@ -66,6 +152,15 @@ const attendre = (ms) => new Promise((r) => setTimeout(r, ms))
   await l.goto(`${BASE}?canal=regions`); await attendre(500)
   await l.click('#btn-tel'); await attendre(7000)
   await l.screenshot({ path: path.join(SORTIE, 'concept-b-portable-demo.png') })
+  // B-7 : mode recadré par défaut sur le portable, tailles rendues ; 56 px au mur.
+  const lis = await l.evaluate(() => {
+    const s = parseFloat(document.querySelector('.scene').style.transform.match(/scale\(([\d.]+)/)[1])
+    const px = (sel) => parseFloat(getComputedStyle(document.querySelector(sel)).fontSize)
+    const deborde = [...document.querySelectorAll('.carte')].filter((n) => n.scrollHeight > n.clientHeight + 1).length
+    return { s, recadre: document.getElementById('btn-recadre').getAttribute('aria-pressed'), texte: px('.carte-texte'), date: px('.carte-date'), deborde }
+  })
+  ok('B-7', lis.recadre === 'true' && lis.texte >= 56, `énoncés à ${lis.texte} px au mur ; mode recadré actif à 1366 px (échelle ${lis.s.toFixed(3)} au lieu de 0,178)`)
+  ok('B-7', lis.texte * lis.s >= 18, `rendu à 1366 px : énoncés ${(lis.texte * lis.s).toFixed(1)} px, dates ${(lis.date * lis.s).toFixed(1)} px ; ${lis.deborde} carte qui déborde`)
   await ctxL.close()
 
   // 5. Vidéo d'environ 15 s : un passage de canal, puis une transmission saisie qui arrive.
@@ -76,7 +171,7 @@ const attendre = (ms) => new Promise((r) => setTimeout(r, ms))
   const t2 = await ctxV.newPage(); suivre(t2, 'vidéo-formulaire')
   await t2.goto(`${BASE}?vue=formulaire`)
   await t2.fill('#phrase', 'Repartir avec une idée pour ma région.')
-  await t2.check('#accord')
+  await t2.check('#accord'); await t2.check('#age')
   await t2.click('button[type="submit"]')
   await t2.close()
   await attendre(6500)
@@ -89,5 +184,6 @@ const attendre = (ms) => new Promise((r) => setTimeout(r, ms))
   await browser.close()
   console.log('Faits en carte (canal JIQ) :', faits.join(', '))
   console.log('Pause : horloge', p1, '→', p2, p1 === p2 ? '(gelée, OK)' : '(ÉCHEC : elle tourne)')
+  console.log('Vérifications des constats :\n' + verifs.join('\n'))
   console.log(erreurs.length ? 'Erreurs console :\n' + erreurs.join('\n') : 'Console : aucune erreur.')
 })()

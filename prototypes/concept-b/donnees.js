@@ -19,7 +19,7 @@ export const FAITS = {
   'F-034': { date: '1991 à 2008', enonce: 'Sections en Estrie, Laval-Laurentides-Lanaudière, Saguenay–Lac-Saint-Jean, Mauricie, Outaouais' },
   'F-010': { date: '1993', enonce: 'Pitch Expert, du CRIM et de Paprican, reçoit l\'OCTAS de l\'innovation' },
   'F-011': { date: '1998', enonce: 'La FiQ se dote d\'un siège social permanent à Montréal' },
-  'F-070': { date: 'depuis 1998', enonce: 'Collaboration avec CIPS pour la certification EATI–IPA' },
+  'F-070': { date: 'depuis 1998 (écrit en 2019-2020)', enonce: 'Collaboration avec CIPS pour la certification EATI–IPA' },
   'F-012': { date: 'avril 2000', enonce: 'Premières Soirées Reconnaissance de la relève étudiante en informatique' },
   'F-014': { date: '28 mai 2005', enonce: '19e concours des OCTAS, au Palais des congrès de Montréal' },
   'F-015': { date: '24 mai 2008', enonce: '22e OCTAS : 124 candidatures, gala au Centre des congrès de Québec' },
@@ -74,11 +74,11 @@ export const CANAUX = [
     id: 'jiq', nom: 'JIQ · éditions', court: 'JIQ',
     question: 'Ce que les sources savent des éditions',
     points: [
-      { f: 'F-001', an: 1976 }, { f: 'F-007', an: 1985 }, { f: 'F-020', an: 2015 }, { f: 'F-022', an: 2018 },
+      { f: 'F-001', an: 1976 }, { f: 'F-002', an: 1976 }, { f: 'F-007', an: 1985 }, { f: 'F-020', an: 2015 }, { f: 'F-022', an: 2018 },
       { f: 'F-024', an: 2019 }, { f: 'F-025', an: 2020 }, { f: 'F-026', an: 2021 }, { f: 'F-054', an: 2022 },
       { f: 'F-028', an: 2023 }, { f: 'F-057', an: 2024 }, { f: 'F-031', an: 2026 },
     ],
-    cartes: ['F-001', 'F-007', 'F-022', 'F-024', 'F-025', 'F-031'],
+    cartes: ['F-001', 'F-002', 'F-007', 'F-022', 'F-024', 'F-025', 'F-031'],
     fin: '7 numéros écrits dans les sources · les autres années restent à écrire',
   },
   {
@@ -124,8 +124,8 @@ export const CANAUX = [
   {
     id: 'rayonnement', nom: 'Rayonnement', court: 'Rayonnement',
     question: 'Au-delà du Québec',
-    points: [{ f: 'F-002', an: 1976 }, { f: 'F-070', an: 1998 }, { f: 'F-052', an: 2019 }, { f: 'F-072', an: 2023.5 }, { f: 'F-079', an: 2025 }],
-    cartes: ['F-002', 'F-070', 'F-052', 'F-079'],
+    points: [{ f: 'F-070', an: 1998 }, { f: 'F-052', an: 2019 }, { f: 'F-072', an: 2023.5 }, { f: 'F-079', an: 2025 }],
+    cartes: ['F-070', 'F-052', 'F-079'],
     fin: 'Votre idée pour faire rayonner les TI : à écrire',
   },
 ]

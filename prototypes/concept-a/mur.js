@@ -31,7 +31,21 @@ const lerp = (a, b, t) => a + (b - a) * t
 // ---------- Mouvement réduit ----------
 const REDUIT = matchMedia('(prefers-reduced-motion: reduce)').matches
 const D = (ms) => (REDUIT ? 0 : ms)
-const ressort = (bounce = 0.35, duration = 600) => (REDUIT ? 'linear' : spring({ bounce, duration }))
+// À étaler dans les paramètres (« ...ressort() ») : en mouvement réduit, la durée est forcée à 0,
+// sinon anime.js appliquerait sa durée par défaut de 1 000 ms (constat A-2 de l'équipe rouge 1).
+const ressort = (bounce = 0.35, duration = 600) => (REDUIT ? { ease: 'linear', duration: 0 } : { ease: spring({ bounce, duration }) })
+
+// ---------- Chiffres qui changent (WCAG 2.3.1, constat A-3) ----------
+// Le compteur et la tête de lecture ne changent pas plus de 3 fois par seconde : pendant le rembobinage,
+// l'année affichée est celle de la tête à des instants espacés de PAS ms (temps de l'animation, donc figé en pause).
+const R_REMBOBINAGE = 9000
+const PAS = 600 // 15 changements en 9 s : jamais plus de 2 dans une même seconde
+function anneeAffichee(annee) {
+  const p = Math.min(1, Math.max(0, (2046 - annee) / (2046 - 1976.3)))
+  const t = (Math.acos(1 - 2 * p) / Math.PI) * R_REMBOBINAGE // inverse de la courbe inOutSine
+  const tq = Math.floor(t / PAS + 1e-6) * PAS
+  return Math.floor(2046 - (2046 - 1976.3) * (1 - Math.cos((Math.PI * tq) / R_REMBOBINAGE)) / 2)
+}
 
 // ---------- État ----------
 const etat = {
@@ -45,6 +59,7 @@ const etat = {
   contribs: [...EXEMPLES],
   enAttente: null, // contribution arrivée pendant la pause
   vedetteIndex: 0,
+  vedette: null, // contribution montrée en vedette
 }
 const xm = (y) => lerp(xS2(y), xS1(y), etat.m)
 
@@ -94,7 +109,7 @@ function construire(racine) {
       <div class="fond"></div>
       <header class="bandeau">
         <div class="marque">
-          <p class="marque-nom">Réseau ACTION TI</p>
+          <p class="marque-nom">Réseau ACTION TI <span class="marque-mention">Proposition non officielle · prototype</span></p>
           <p class="marque-citation" data-fait="F-030">${esc(FAITS['F-030'].texte)} <span class="fait-id">F-030</span></p>
         </div>
       </header>
@@ -205,8 +220,9 @@ function rendreAxe() {
   }
   el.tete.style.transform = `translateX(${xm(etat.annee)}px)`
   el.tete.style.opacity = etat.tete ? 1 : 0
-  el.teteAnnee.textContent = Math.floor(etat.annee)
-  if (etat.plan === 'rembobiner') el.compteur.textContent = Math.floor(etat.annee)
+  const a = String(anneeAffichee(etat.annee))
+  if (el.teteAnnee.textContent !== a) el.teteAnnee.textContent = a
+  if (etat.plan === 'rembobiner' && el.compteur.textContent !== a) el.compteur.textContent = a
 }
 
 // Placement des cellules d'édition sous l'axe (échelle 1) : chaque cellule vise l'aplomb de son année,
@@ -330,8 +346,9 @@ function scene1() {
   el.compteur.textContent = '2046'
   el.compteurSous.textContent = 'dans 20 ans'
   utils.set('#compteur', { opacity: 1 })
+  utils.set(el.compteur, { opacity: 1 }) // au cas où un fondu de vedette a été interrompu
 
-  const R = 9000 // durée du rembobinage 2046 → 1976
+  const R = R_REMBOBINAGE // durée du rembobinage 2046 → 1976
   const P2 = 8500
   const P3 = P2 + R + 1500
 
@@ -341,8 +358,8 @@ function scene1() {
   // Plan 1 · L'horizon déclaré
   tl.call(() => titre('Scène 1 · Compte à rebours', 'L’horizon déclaré', 'Le Réseau écrit déjà ses prochaines années'), 0)
   tl.add('.horizon-titre', { opacity: [0, 1], duration: D(600) }, 200)
-  tl.add('.carte-horizon', { opacity: [0, 1], translateY: [120, 0], scale: [0.92, 1], ease: ressort(0.3, 700), delay: stagger(D(260)) }, 400)
-  tl.add('#cerf', { opacity: [0, 1], translateY: [80, 0], ease: ressort(0.3, 700) }, 1700)
+  tl.add('.carte-horizon', { opacity: [0, 1], translateY: [120, 0], scale: [0.92, 1], ...ressort(0.3, 700), delay: stagger(D(260)) }, 400)
+  tl.add('#cerf', { opacity: [0, 1], translateY: [80, 0], ...ressort(0.3, 700) }, 1700)
   tl.add(el.lienCerf, { draw: ['0 0', '0 1'], duration: D(900), ease: 'inOutQuad' }, 1900)
   tl.add('#hypothese', { opacity: [0, 1], duration: D(900) }, 2600)
 
@@ -403,7 +420,7 @@ function scene1() {
     const t0 = P3 + 300 + i * 5200
     tl.call(() => montrerEcart(e, i), t0)
     tl.add(el.arcsD[i], { draw: ['0 0', '0 1'], duration: D(1400), ease: 'inOutQuad' }, t0)
-    tl.add('#ecart', { opacity: [0, 1], translateY: [70, 0], ease: ressort(0.25, 650) }, t0 + 300)
+    tl.add('#ecart', { opacity: [0, 1], translateY: [70, 0], ...ressort(0.25, 650) }, t0 + 300)
     tl.add('#ecart', { opacity: 0, duration: D(450) }, t0 + 4700)
     tl.add(el.arcs.children[i], { opacity: 0.35, duration: D(450) }, t0 + 4700)
   })
@@ -440,6 +457,7 @@ function scene2(arrivee = null) {
   el.compteur.textContent = '2026'
   el.compteurSous.textContent = '→ 2046'
   utils.set('#compteur', { opacity: 1 })
+  utils.set(el.compteur, { opacity: 1 }) // au cas où un fondu de vedette a été interrompu
   if (dejaLa) {
     // Déjà en scène 2 (souhait arrivé en direct) : on garde l'axe déployé et les points d'édition.
     etat.m = 0
@@ -455,7 +473,7 @@ function scene2(arrivee = null) {
   rendreAxe()
   rangerPoints()
   for (const c of etat.contribs) utils.set(c._el, { translateX: c._pos.x, translateY: c._pos.y - 500, opacity: 0 })
-  majBilan(0)
+  majBilan() // total affiché d'emblée, sans décompte rapide (WCAG 2.3.1)
 
   const tl = createTimeline({ onComplete: () => scene1() })
   tlCourante = tl
@@ -473,16 +491,14 @@ function scene2(arrivee = null) {
   }
   tl.add(el.arcs.children, { opacity: 0, duration: D(600) }, 0)
   tl.add('#hypothese', { opacity: 1, translateY: 0, duration: D(800) }, 1500)
-  tl.add('#releve', { opacity: [0, 1], translateY: [60, 0], ease: ressort(0.3, 700) }, 1800)
+  tl.add('#releve', { opacity: [0, 1], translateY: [60, 0], ...ressort(0.3, 700) }, 1800)
   tl.add('#bilan', { opacity: [0, 1], duration: D(700) }, 2200)
   // Les souhaits tombent dans leurs colonnes, un ressort par point.
   tl.add(
     etat.contribs.map((c) => c._el),
-    { opacity: [0, 1], translateY: (t) => [Number(t.dataset.y) - 500, Number(t.dataset.y)], ease: ressort(0.5, 700), delay: stagger(D(70)) },
+    { opacity: [0, 1], translateY: (t) => [Number(t.dataset.y) - 500, Number(t.dataset.y)], ...ressort(0.5, 700), delay: stagger(D(70)) },
     2600
   )
-  const compteur = { n: 0 }
-  tl.add(compteur, { n: etat.contribs.length, duration: D(2000), ease: 'outQuad', onUpdate: () => majBilan(compteur.n), onComplete: () => majBilan() }, 2600)
 
   // Vedettes : un souhait grossit depuis son point, se lit, puis rentre dans sa colonne.
   const choix = []
@@ -511,6 +527,9 @@ function contenuVedette(c, direct) {
 }
 
 function montrerVedette(c, direct) {
+  // Une contribution retirée entre-temps n'est plus montrée (constat A-1).
+  if (!etat.contribs.includes(c)) return
+  etat.vedette = c
   const v = el.vedette
   const cont = v.querySelector('.vedette-contenu')
   cont.innerHTML = contenuVedette(c, direct)
@@ -527,18 +546,29 @@ function montrerVedette(c, direct) {
   anim(v, {
     translateX: { to: x, ease: REDUIT ? 'linear' : direct ? 'outCubic' : spring({ bounce: 0.28, duration: 700 }), duration: D(1100) },
     translateY: { to: VED_Y, ease: REDUIT ? 'linear' : direct ? 'inOutQuad' : spring({ bounce: 0.28, duration: 700 }), duration: D(1100) },
-    width: { to: VED_W, ease: ressort(0.3, 700), delay: D(direct ? 500 : 0) },
-    height: { to: VED_H, ease: ressort(0.3, 700), delay: D(direct ? 500 : 0) },
+    width: { to: VED_W, ...ressort(0.3, 700), delay: D(direct ? 500 : 0) },
+    height: { to: VED_H, ...ressort(0.3, 700), delay: D(direct ? 500 : 0) },
     borderRadius: { to: 22, duration: D(600) },
   })
   anim(cont, { opacity: [0, 1], duration: D(500), delay: D(direct ? 1100 : 450) })
-  const an = { a: 2026 }
-  anim(an, { a: c.an, duration: D(1400), ease: 'outQuart', onUpdate: () => (el.compteur.textContent = Math.round(an.a)), onComplete: () => (el.compteur.textContent = c.an) })
+  // Compteur : fondu vers l'année du souhait, un seul changement (WCAG 2.3.1, constat A-3).
   if (REDUIT) el.compteur.textContent = c.an
+  else
+    anim(el.compteur, {
+      opacity: [1, 0],
+      duration: 250,
+      ease: 'inQuad',
+      onComplete: () => {
+        el.compteur.textContent = c.an
+        anim(el.compteur, { opacity: [0, 1], duration: 350, ease: 'outQuad' })
+      },
+    })
 }
 
 function cacherVedette(c) {
   const v = el.vedette
+  if (etat.vedette === c) etat.vedette = null
+  if (!etat.contribs.includes(c)) return // déjà effacée par retirer()
   const cont = v.querySelector('.vedette-contenu')
   anim(cont, { opacity: 0, duration: D(250) })
   anim(v, {
@@ -547,7 +577,7 @@ function cacherVedette(c) {
     width: POINT,
     height: POINT,
     borderRadius: POINT / 2,
-    ease: ressort(0.2, 700),
+    ...ressort(0.2, 700),
     delay: D(200),
     onComplete: () => {
       utils.set(v, { opacity: 0 })
@@ -580,6 +610,14 @@ function retirer(id) {
   const [c] = etat.contribs.splice(i, 1)
   c._el?.remove()
   if (etat.enAttente === c) etat.enAttente = null
+  if (etat.vedette === c) {
+    // Retrait pendant la vedette : on l'efface tout de suite (constat A-1).
+    etat.vedette = null
+    el.vedette.querySelector('.vedette-contenu').innerHTML = ''
+    utils.set(el.vedette, { opacity: 0 })
+    utils.set(el.compteur, { opacity: 1 })
+    el.compteur.textContent = '2026'
+  }
   rangerPoints()
   for (const x of etat.contribs) if (etat.scene === 2) utils.set(x._el, { translateX: x._pos.x, translateY: x._pos.y })
   majBilan()

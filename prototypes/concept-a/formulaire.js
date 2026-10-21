@@ -11,6 +11,15 @@ const T = {
     langue: 'English',
     langueNom: 'Switch to English',
     marque: 'Réseau ACTION TI · 50 années',
+    mention: 'Proposition non officielle · prototype',
+    avisTitre: 'Avant d’envoyer : vos renseignements',
+    avisQui: '<b>Qui recueille :</b> le Réseau ACTION TI (hypothèse, à confirmer).',
+    avisPourquoi: '<b>Pourquoi :</b> afficher votre souhait sur le mur du 50<sup>e</sup>, rien d’autre. Ni nom ni courriel ne sont demandés.',
+    avisDuree: '<b>Combien de temps :</b> pendant l’événement seulement (durée à confirmer), ou jusqu’en 2046 si vous cochez la capsule. En démo, tout est effacé à la fin.',
+    avisRetrait: '<b>Comment retirer :</b> le bouton « Retirer ma contribution » après l’envoi, ou plus tard avec le code de retrait affiché après l’envoi.',
+    avisSimule: 'Démo : cet avis et le code de retrait sont simulés.',
+    codeTitre: 'Votre code de retrait :',
+    codeAide: 'Notez-le : il servirait à retirer votre souhait après avoir fermé cette page. Simulé : en démo, ce code n’est relié à aucun service.',
     titre: '2046 : écrivez la suite',
     intro: 'Le mur affiche, de 2027 à 2046, les souhaits approuvés par un modérateur. 30 secondes.',
     demo: 'Démo hors ligne : rien ne quitte ce portable. Ce que vous saisissez est effacé après la démo.',
@@ -47,6 +56,15 @@ const T = {
     langue: 'Français',
     langueNom: 'Passer en français',
     marque: 'Réseau ACTION TI · 50 years',
+    mention: 'Unofficial proposal · prototype',
+    avisTitre: 'Before you send: your information',
+    avisQui: '<b>Who collects it:</b> Réseau ACTION TI (assumption, to be confirmed).',
+    avisPourquoi: '<b>Why:</b> to show your wish on the 50th anniversary wall, nothing else. No name or email is asked for.',
+    avisDuree: '<b>How long:</b> during the event only (length to be confirmed), or until 2046 if you tick the time capsule. In the demo, everything is erased at the end.',
+    avisRetrait: '<b>How to withdraw:</b> the “Withdraw my contribution” button after sending, or later with the withdrawal code shown after sending.',
+    avisSimule: 'Demo: this notice and the withdrawal code are simulated.',
+    codeTitre: 'Your withdrawal code:',
+    codeAide: 'Write it down: it would let you withdraw your wish after closing this page. Simulated: in the demo, this code is not linked to any service.',
     titre: '2046: write what comes next',
     intro: 'From 2027 to 2046, the wall shows the wishes a moderator has approved. 30 seconds.',
     demo: 'Offline demo: nothing leaves this laptop. What you type is erased after the demo.',
@@ -91,7 +109,7 @@ function gabarit(t) {
   return `
   <main class="tel" lang="${langue}">
     <div class="tel-haut">
-      <p class="tel-marque">${t.marque}</p>
+      <div><p class="tel-marque">${t.marque}</p><p class="tel-mention">${t.mention}</p></div>
       <button type="button" class="tel-langue" id="b-langue" lang="${langue === 'fr' ? 'en' : 'fr'}" aria-label="${t.langueNom}">${t.langue}</button>
     </div>
     <h1>${t.titre}</h1>
@@ -121,7 +139,13 @@ function gabarit(t) {
         <label class="case"><input type="checkbox" name="releve" id="releve"><span>${t.releve}</span></label>
       </div>
 
-      <fieldset>
+      <section class="tel-avis" aria-labelledby="avis-titre">
+        <h2 id="avis-titre">${t.avisTitre}</h2>
+        <ul><li>${t.avisQui}</li><li>${t.avisPourquoi}</li><li>${t.avisDuree}</li><li>${t.avisRetrait}</li></ul>
+        <p><small>${t.avisSimule}</small></p>
+      </section>
+
+      <fieldset aria-describedby="avis-titre">
         <legend>4. ${t.consent}</legend>
         <label class="case"><input type="checkbox" id="c1" name="c1" required><span>${t.c1} <span class="obl">*</span></span></label>
         <label class="case"><input type="checkbox" id="c2" name="c2" required aria-describedby="c2-aide"><span>${t.c2} <span class="obl">*</span><small id="c2-aide">${t.c2aide}</small></span></label>
@@ -136,6 +160,7 @@ function gabarit(t) {
       <h2 id="statut-titre" tabindex="-1"></h2>
       <p class="statut-citation" id="statut-citation"></p>
       <p id="statut-texte"></p>
+      <div class="statut-code" id="statut-code" hidden><p>${t.codeTitre} <b id="code-retrait"></b></p><p><small>${t.codeAide}</small></p></div>
       <button type="button" class="bouton bouton-principal" id="b-approuver">${t.approuver}</button>
       <button type="button" class="bouton bouton-second" id="b-retirer">${t.retirer}</button>
       <button type="button" class="bouton bouton-second" id="b-autre" hidden>${t.recommencer}</button>
@@ -180,12 +205,14 @@ function rendre(racine) {
       releve: form.releve.checked,
       capsule: false, // palier 1 : rien n'est conservé, même si la case est cochée
     }
+    // Code de retrait simulé (constat T-1) : affiché après l'envoi, relié à aucun service.
+    derniere.code = 'R-' + Array.from(crypto.getRandomValues(new Uint8Array(4)), (o) => 'ACDEFHJKMNPRTUVWXY34679'[o % 23]).join('')
     form.hidden = true
     montrerStatut(racine, 'attente')
   })
 
   racine.querySelector('#b-approuver').addEventListener('click', () => {
-    canal.envoyer({ type: 'approuvee', contribution: derniere })
+    canal.envoyer({ type: 'approuvee', contribution: { ...derniere, code: undefined } }) // le code reste sur le téléphone
     montrerStatut(racine, 'affichee')
   })
   racine.querySelector('#b-retirer').addEventListener('click', () => {
@@ -210,6 +237,8 @@ function montrerStatut(racine, etape) {
   racine.querySelector('#b-approuver').hidden = etape !== 'attente'
   racine.querySelector('#b-retirer').hidden = etape === 'retiree'
   racine.querySelector('#b-autre').hidden = etape !== 'retiree'
+  racine.querySelector('#statut-code').hidden = etape === 'retiree' || !derniere
+  racine.querySelector('#code-retrait').textContent = derniere?.code ?? ''
   if (etape === 'attente') {
     etat.textContent = t.attente
     etat.className = 'statut-etat'

@@ -107,13 +107,13 @@ body.vue-mur { background: #05080f; color: var(--texte); overflow: hidden; min-h
 
 /* Cartes */
 .cartes { position: absolute; inset: 0; pointer-events: none; }
-.carte { position: absolute; width: 960px; height: 236px; padding: 18px 26px; background: var(--fond-2); border: 2px solid var(--ligne); border-left: 10px solid var(--signal); border-radius: 10px; overflow: hidden; }
+.carte { position: absolute; width: 1120px; height: 300px; padding: 18px 26px; background: var(--fond-2); border: 2px solid var(--ligne); border-left: 10px solid var(--signal); border-radius: 10px; overflow: hidden; }
 .carte p { margin: 0; }
-.carte-date { font-family: var(--mono); font-size: 34px; color: var(--signal); margin-bottom: 8px !important; }
-.carte-texte { font-size: 46px; line-height: 1.16; color: var(--texte); }
+.carte-date { font-family: var(--mono); font-size: 38px; color: var(--signal); margin-bottom: 8px !important; }
+.carte-texte { font-size: 56px; line-height: 1.14; color: var(--texte); }
 .carte-public { border-left-color: var(--public); }
 .carte-public .carte-date { color: var(--public); font-size: 30px; }
-.carte-public .carte-texte { font-size: 42px; }
+.carte-public .carte-texte { font-size: 48px; }
 .carte-sig { font-size: 28px; color: var(--texte-2); margin-top: 6px !important; }
 .fin-canal { position: absolute; margin: 0; width: 1500px; font-size: 42px; color: var(--public); font-weight: 600; }
 .horizon { font-family: var(--mono); font-size: 34px; color: var(--public); font-weight: 400; }
@@ -133,6 +133,7 @@ body.reduit .fin-canal { opacity: 1; }
 .j-s.attente { color: var(--signal); }
 .j-s.approuvee { color: #9be2a8; }
 .legende { width: 1700px; font-size: 32px; color: var(--texte-2); }
+.legende .non-officiel { color: var(--texte); font-weight: 600; }
 .legende p { margin: 6px 0; display: flex; align-items: center; gap: 16px; }
 .lg { display: inline-block; flex: none; }
 .lg-num { padding: 2px 10px; background: var(--texte); color: var(--fond); font-family: var(--mono); font-weight: 700; border-radius: 6px; font-size: 28px; }
@@ -147,7 +148,7 @@ body.reduit .fin-canal { opacity: 1; }
 .badge-pause { position: absolute; right: 60px; top: 1800px; margin: 0; padding: 10px 30px; font-family: var(--mono); font-size: 44px; color: var(--fond); background: var(--signal); border-radius: 10px; }
 
 /* Barre de commandes de la démo (taille réelle, sous le mur) */
-.barre { display: flex; flex-wrap: wrap; gap: 8px; justify-content: flex-start; padding: 10px 16px; max-width: 980px; }
+.barre { display: flex; flex-wrap: wrap; gap: 8px; justify-content: flex-start; padding: 10px 16px; max-width: 1366px; }
 .barre[hidden] { display: none; }
 .barre button, .cloture button, .fermer-tel { font: 600 14px var(--sans); padding: 8px 12px; min-height: 36px; color: var(--texte); background: #1b2540; border: 1px solid #4a5a82; border-radius: 8px; cursor: pointer; }
 .barre button[aria-pressed="true"] { background: var(--signal); color: var(--fond); border-color: var(--signal); }
@@ -194,6 +195,24 @@ body.vue-formulaire { background: #f7f4ec; color: #18202e; }
 .pastille.ok { background: #1d7a3a; }
 .tel-pied { margin-top: 20px; font-size: 13px; color: #4a4639; }
 body.integre .tel { padding: 12px; }
+.tel-mention { margin: 2px 0 0; font-size: 13px; font-weight: 700; color: #4a4639; }
+.avis { margin: 0 0 14px; padding: 10px 12px; background: #fff; border: 1px solid #c9c2b0; border-radius: 8px; font-size: 14px; }
+.avis h2, .envois h2 { margin: 0 0 6px; font-size: 16px; }
+.avis ul { margin: 0; padding-left: 18px; }
+.avis li { margin-bottom: 4px; }
+.avis-simule { margin: 6px 0 0; font-style: italic; color: #4a4639; }
+.envois { margin-top: 14px; }
+.envois ul { margin: 0; padding: 0; list-style: none; }
+.envoi { margin-bottom: 8px; padding: 10px 12px; background: #fff; border: 1px solid #c9c2b0; border-radius: 8px; }
+.envoi p { margin: 0 0 6px; }
+.code { font-family: var(--mono); font-size: 18px; letter-spacing: 0.06em; }
+.retirer { min-height: 48px; padding: 8px 16px; font: 700 16px var(--sans); color: #8a3f08; background: #fff; border: 2px solid #8a3f08; border-radius: 10px; cursor: pointer; }
+.par-code { margin-top: 14px; }
+.par-code summary { min-height: 48px; display: flex; align-items: center; cursor: pointer; font-weight: 600; }
+.par-code input { width: 100%; min-height: 48px; font: 600 18px var(--mono); padding: 8px 10px; border: 2px solid #6b6455; border-radius: 8px; margin: 6px 0 0; }
+.par-code label { font-weight: 700; display: block; }
+.par-code .retirer { margin-top: 10px; }
+.etat-code { min-height: 1em; margin: 8px 0 0; }
 
 @media (prefers-reduced-motion: reduce) {
   * { transition: none !important; scroll-behavior: auto !important; }

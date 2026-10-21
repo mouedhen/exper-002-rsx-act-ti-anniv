@@ -6,7 +6,7 @@ import {
   AN_DEBUT, AN_FIN, AN_AUJOURDHUI, FAITS, EDITIONS, JIQ_SANS_NUMERO, JIQ_REPORTEE,
   CANAUX, CANAL_PUBLIC, EXEMPLES,
 } from './donnees.js'
-import { envoyer, ecouter, lireMemoire, ecrireMemoire, effacerMemoire } from './canal.js'
+import { envoyer, ecouter, purgerAncienneMemoire } from './canal.js'
 
 // ---------- Géométrie de la scène ----------
 const L = 7680, H = 2160
@@ -14,8 +14,8 @@ const X0 = 840, X1 = 7600
 const NB_ANS = AN_FIN - AN_DEBUT + 1
 const PAS = (X1 - X0) / NB_ANS
 const RANGS_HAUT = 300, RANGS_H = 1590
-const H_ACTIF = 700
-const CARTE_L = 960, CARTE_H = 236, ECART = 28
+const H_ACTIF = 820
+const CARTE_L = 1120, CARTE_H = 300, ECART = 28 // énoncés à 56 px au mur (B-7)
 const xAn = (an) => X0 + (an - AN_DEBUT + 0.5) * PAS
 const X_MAINTENANT = xAn(AN_AUJOURDHUI)
 const ANTENNE = { x: 7395, y: 2030 }
@@ -48,6 +48,14 @@ const etat = {
   tl: null,
   minuteries: [],
   file: Promise.resolve(),
+  enAttente: [], // transmissions reçues pendant la pause (B-5)
+  vols: new Map(), // id → arrivée en cours, annulable au retrait (B-1)
+  recadre: false, // mode recadré du portable (B-7)
+  echelle: 1,
+  largeurVue: L,
+  camX: 0,
+  camCible: 0,
+  sonde: null,
 }
 
 let el = {}
@@ -58,6 +66,8 @@ export function monterMur(racine, params) {
   engine.pauseOnDocumentHidden = false
   const mq = matchMedia('(prefers-reduced-motion: reduce)')
   etat.reduit = mq.matches || params.get('reduit') === '1'
+  // Recadrage : par défaut sur un écran de portable (moins de 1700 px), sauf en kiosque ou avec ?recadre=0.
+  etat.recadre = params.get('recadre') === '1' || (params.get('recadre') !== '0' && params.get('kiosque') !== '1' && innerWidth < 1700)
   mq.addEventListener('change', (e) => { etat.reduit = e.matches; relancer() })
 
   racine.innerHTML = gabarit()
@@ -82,8 +92,9 @@ export function monterMur(racine, params) {
   }
   if (params.get('kiosque') === '1') document.body.classList.add('kiosque')
 
-  // Mémoire de la démo (contributions déjà transmises sur ce portable).
-  etat.transmissions = lireMemoire().map((t) => ({ ...t, statut: 'approuvee' }))
+  // Mémoire de la démo : en mémoire de page seulement, rien ne survit au rechargement (B-6).
+  purgerAncienneMemoire()
+  etat.transmissions = []
   majCases()
   majCompteur()
   majJournal()
@@ -94,6 +105,8 @@ export function monterMur(racine, params) {
   // Horloge du jour : une minuterie anime.js, donc gelée par la pause comme tout le reste.
   majHorloge()
   createTimer({ duration: 1000, loop: true, onLoop: majHorloge })
+  // Caméra du mode recadré : une minuterie anime.js aussi, donc gelée par la pause.
+  createTimer({ duration: 1000, loop: true, onUpdate: majCamera })
 
   // Commandes.
   racine.querySelector('#btn-pause').addEventListener('click', basculerPause)
@@ -108,24 +121,56 @@ export function monterMur(racine, params) {
   racine.querySelector('#btn-tel').addEventListener('click', basculerTel)
   racine.querySelector('#qr').addEventListener('click', basculerTel)
   racine.querySelector('#btn-reduit').addEventListener('click', () => { etat.reduit = !etat.reduit; relancer() })
+  racine.querySelector('#btn-recadre').addEventListener('click', () => { etat.recadre = !etat.recadre; majBoutons(); mettreALEchelle() })
   racine.querySelector('#btn-cloture').addEventListener('click', () => { el.cloture.hidden = false; el.cloture.querySelector('button').focus() })
   racine.querySelector('#fermer-cloture').addEventListener('click', () => { el.cloture.hidden = true })
   racine.querySelector('#btn-effacer').addEventListener('click', () => {
-    effacerMemoire(); etat.transmissions = []; majCases(); majCompteur(); majJournal(); relancer()
+    etat.vols.forEach((v) => v.annuler()); etat.vols.clear(); etat.enAttente = []
+    etat.transmissions = []; majCases(); majCompteur(); majJournal(); relancer()
   })
 
   // Transmissions venues du formulaire (même portable).
   ecouter((m) => {
+    if (m?.genre === 'retrait') { retirer(m.id); return }
     if (m?.genre !== 'transmission') return
-    envoyer({ genre: 'recu', id: m.id })
-    if (etat.scene !== 2) allerScene(2)
-    recevoir({ ...m, origine: 'demo' })
+    envoyer({ genre: 'recu', id: m.id, enPause: etat.pause })
+    if (etat.pause) {
+      // B-5 : le mur reste figé ; la transmission attend la reprise.
+      etat.enAttente.push(m)
+      el.annonce.textContent = 'Une transmission attend la reprise.'
+      return
+    }
+    arriver(m)
   })
 
   const canalDepart = CANAUX.findIndex((c) => c.id === params.get('canal'))
   if (canalDepart >= 0) etat.canal = canalDepart
   if (params.get('scene') === '2') allerScene(2); else allerScene(1)
   majBoutons()
+}
+
+function arriver(m) {
+  if (etat.scene !== 2) allerScene(2)
+  recevoir({ ...m, origine: 'demo' })
+}
+
+// B-1 : le retrait enlève tout (journal, case, compteur, carte, arrivée en cours, file de la pause).
+function retirer(id) {
+  const i = etat.enAttente.findIndex((m) => m.id === id)
+  if (i >= 0) etat.enAttente.splice(i, 1)
+  const t = etat.transmissions.find((x) => x.id === id && x.origine === 'demo')
+  if (!t && i < 0) { envoyer({ genre: 'inconnu', id }); return }
+  if (t) {
+    t.statut = 'retiree'
+    etat.transmissions = etat.transmissions.filter((x) => x !== t)
+  }
+  const v = etat.vols.get(id)
+  if (v) { v.annuler(); etat.vols.delete(id) }
+  el.cartes.querySelector(`.carte-public[data-id="${id}"]`)?.remove()
+  majJournal(); majCompteur(); majCases()
+  majCartesPublic(false)
+  el.annonce.textContent = 'Une transmission a été retirée par son auteur.'
+  envoyer({ genre: 'retiree', id })
 }
 
 function gabarit() {
@@ -180,6 +225,7 @@ function gabarit() {
         <div class="legende">
           <p><span class="lg lg-num">40e</span> édition numérotée dans une source <span class="lg lg-vide"></span> année sans source : à écrire</p>
           <p><span class="lg lg-point"></span> fait sourcé (F-xxx) <span class="lg lg-pub"></span> transmission du public</p>
+          <p class="non-officiel">Proposition non officielle · prototype</p>
         </div>
         <button id="qr" class="qr" type="button" aria-label="Ouvrir le formulaire de contribution (QR simulé)">
           <span class="qr-motif">${motifQr()}</span>
@@ -196,6 +242,7 @@ function gabarit() {
     <button id="btn-s2" type="button">Scène 2 · Canal entrant</button>
     <button id="btn-tel" type="button" aria-expanded="false" aria-controls="panneau-tel">Téléphone (démo)</button>
     <button id="btn-reduit" type="button" aria-pressed="false">Mouvement réduit</button>
+    <button id="btn-recadre" type="button" aria-pressed="false">Recadrer (portable)</button>
     <button id="btn-cloture" type="button">Ce que ça demande au Réseau</button>
     <button id="btn-effacer" type="button">Effacer la démo</button>
   </nav>
@@ -272,10 +319,33 @@ function mettreALEchelle() {
   const kiosque = document.body.classList.contains('kiosque')
   let barre = !kiosque && vh - H * s >= barreH
   if (H * s > vh) { s = vh / H; barre = false }
-  el.scene.style.transform = `scale(${s})`
-  el.cadre.style.width = `${L * s}px`
+  // B-7 : en mode recadré, le mur remplit la hauteur et la caméra suit la sonde (environ la moitié du mur visible).
+  if (etat.recadre) {
+    const sr = (vh - (kiosque ? 0 : barreH)) / H
+    if (sr > s) { s = sr; barre = !kiosque }
+  }
+  etat.echelle = s
+  etat.largeurVue = Math.min(L, vw / s)
+  el.cadre.style.width = `${Math.min(L * s, vw)}px`
   el.cadre.style.height = `${H * s}px`
   el.barre.hidden = !barre
+  majCamera(true)
+}
+
+// Caméra du mode recadré : suit la sonde en scène 1, se place sur le présent et l'avenir en scène 2.
+function majCamera(immediat = false) {
+  if (!el.scene) return
+  const W = etat.largeurVue, max = Math.max(0, L - W)
+  let cible = 0
+  if (etat.recadre && max > 0) {
+    if (etat.scene === 2) cible = max
+    else if (!etat.reduit && etat.sonde?.isConnected) cible = parseFloat(utils.get(etat.sonde, 'translateX')) - W * 0.5
+    else cible = etat.camCible
+    cible = Math.min(Math.max(cible, 0), max)
+  }
+  if (immediat === true || etat.reduit || !etat.recadre) etat.camX = cible
+  else etat.camX += (cible - etat.camX) * 0.06
+  el.scene.style.transform = `scale(${etat.echelle}) translateX(${-etat.camX.toFixed(1)}px)`
 }
 
 // ---------- Pause (WCAG 2.2.2) ----------
@@ -283,6 +353,7 @@ function basculerPause() {
   etat.pause = !etat.pause
   if (etat.pause) engine.pause(); else engine.resume()
   majBoutons()
+  if (!etat.pause && etat.enAttente.length) etat.enAttente.splice(0).forEach(arriver)
   el.annonce.textContent = etat.pause ? 'Mouvement en pause.' : 'Mouvement repris.'
 }
 
@@ -293,6 +364,7 @@ function majBoutons() {
   el.pauseScene.setAttribute('aria-pressed', String(etat.pause))
   el.badgePause.hidden = !etat.pause
   el.btnReduit.setAttribute('aria-pressed', String(etat.reduit))
+  document.getElementById('btn-recadre')?.setAttribute('aria-pressed', String(etat.recadre))
   document.body.classList.toggle('reduit', etat.reduit)
 }
 
@@ -485,6 +557,7 @@ function passerCanal(i) {
   svg('circle', { r: 30, class: 'sonde-halo' }, sonde)
   svg('circle', { r: 14, class: 'sonde-coeur' }, sonde)
   utils.set(sonde, { translateX: X_MAINTENANT, translateY: y })
+  etat.sonde = sonde
 
   // Cartes : énoncés tels quels, F-xxx en data-fait.
   const items = c.cartes.map((f) => {
@@ -522,6 +595,9 @@ function passerCanal(i) {
     cartes.forEach(({ n }) => n.classList.add('visible'))
     sonde.remove()
     fin.classList.add('visible')
+    // Mode recadré sans mouvement : le passé d'abord, puis un saut vers le présent et l'avenir.
+    etat.camCible = 0
+    planifier(DUREE_CANAL / 2, () => { etat.camCible = L })
   } else {
     utils.set(cartes.map((k) => k.n), { opacity: 0, translateY: 30 })
     utils.set(cartes.map((k) => k.lien), { opacity: 0 })
@@ -623,8 +699,8 @@ function recevoir(m) {
   const y = () => dispoCourante.public.centre
 
   const approuver = () => {
+    if (t.statut === 'retiree') return
     t.statut = 'approuvee'
-    ecrireMemoire(etat.transmissions.filter((x) => x.statut === 'approuvee'))
     envoyer({ genre: 'approuvee', id: t.id, an: t.an })
     majJournal(); majCompteur(); majCases()
     const caseAn = el.rangs.public.querySelector(`.cp[data-an="${t.an}"]`)
@@ -633,7 +709,11 @@ function recevoir(m) {
     el.annonce.textContent = `Approuvée : ${libelleType(t)}.`
   }
 
-  if (etat.reduit) { createTimer({ duration: 1600, onComplete: approuver }); return }
+  if (etat.reduit) {
+    const tm = createTimer({ duration: 1600, onComplete: () => { etat.vols.delete(t.id); approuver() } })
+    etat.vols.set(t.id, { annuler: () => tm.cancel() })
+    return
+  }
 
   const yc = y()
   const arrivee = svg('path', { d: `M${ANTENNE.x} ${ANTENNE.y} C${ANTENNE.x - 700} ${ANTENNE.y - 520}, ${X_MAINTENANT + 420} ${yc - 420}, ${X_MAINTENANT} ${yc}`, class: 'trace trace-pub' })
@@ -649,9 +729,11 @@ function recevoir(m) {
   attente.textContent = 'en attente de validation · modération simulée'
   utils.set([anneau, attente], { opacity: 0 })
 
+  const noeuds = [arrivee, depot, g, anneau, attente]
   const tl = createTimeline({
-    onComplete: () => { [arrivee, depot, g, anneau, attente].forEach((n) => n.remove()) },
+    onComplete: () => { noeuds.forEach((n) => n.remove()); etat.vols.delete(t.id) },
   })
+  etat.vols.set(t.id, { annuler: () => { tl.cancel(); noeuds.forEach((n) => n.remove()) } })
   tl.add(createDrawable(arrivee), { draw: ['0 0', '0 1'], duration: 1400, ease: 'inOutQuad' }, 0)
     .add(g, { ...createMotionPath(arrivee), duration: 1400, ease: 'inOutQuad' }, 0)
     .add(arrivee, { opacity: [1, 0], duration: 500 }, 1500)

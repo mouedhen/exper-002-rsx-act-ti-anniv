@@ -36,10 +36,15 @@ body.vue-mur { overflow: hidden; background: #05070f; }
     linear-gradient(180deg, #0b1124 0%, #0a0f1f 60%, #080c19 100%);
 }
 
-.fait-id { font-family: ui-monospace, "SF Mono", Menlo, Consolas, monospace; font-size: .62em; color: var(--texte-2); letter-spacing: .04em; }
+.fait-id { font-family: ui-monospace, "SF Mono", Menlo, Consolas, monospace; font-size: max(.8em, 32px); /* A-5 : 32 px au moins au mur */ color: var(--texte-2); letter-spacing: .04em; }
 
 .bandeau { position: absolute; left: 400px; top: 60px; }
 .marque-nom { font-size: 54px; font-weight: 700; letter-spacing: .06em; text-transform: uppercase; color: var(--fait); }
+.marque-mention { /* constat A-4 */
+  display: inline-block; vertical-align: middle; margin-left: 28px; padding: 4px 20px;
+  font-size: 36px; font-weight: 400; letter-spacing: .04em; text-transform: none;
+  color: var(--texte-2); border: 3px dashed var(--texte-2); border-radius: 30px;
+}
 .marque-citation { font-size: 40px; color: var(--texte-2); margin-top: 8px; max-width: 2400px; }
 
 #compteur { position: absolute; left: 380px; top: 210px; display: flex; flex-direction: column; }
@@ -213,6 +218,13 @@ body.vue-formulaire {
 }
 .tel { max-width: 440px; margin: 0 auto; padding: 16px 16px 40px; }
 .tel-haut { display: flex; justify-content: space-between; align-items: center; gap: 8px; }
+.tel-mention { /* constat A-4 */ display: inline-block; font-size: 13px; font-weight: 700; color: var(--f-texte); border: 2px dashed var(--f-bord); border-radius: 12px; padding: 2px 8px; margin: 4px 0 0; }
+.tel-avis { font-size: 14px; background: #fff; border: 2px solid var(--f-bord); border-radius: 10px; padding: 10px 12px; margin: 0 0 18px; }
+.tel-avis h2 { font-size: 15px; margin: 0 0 4px; }
+.tel-avis ul { margin: 0; padding-left: 18px; }
+.tel-avis li { margin: 2px 0; }
+.statut-code { font-size: 15px; background: #fff; border: 2px dashed var(--f-accent); border-radius: 10px; padding: 8px 12px; margin: 10px 0; }
+.statut-code b { font-family: ui-monospace, Menlo, Consolas, monospace; font-size: 20px; letter-spacing: .08em; }
 .tel-marque { font-size: 13px; font-weight: 700; letter-spacing: .06em; text-transform: uppercase; color: var(--f-accent); }
 .tel-langue { font: inherit; font-size: 14px; min-height: 44px; min-width: 44px; padding: 0 12px; border: 2px solid var(--f-accent); color: var(--f-accent); background: #fff; border-radius: 22px; cursor: pointer; }
 .tel h1 { font-size: 28px; line-height: 1.15; margin: 12px 0 6px; }

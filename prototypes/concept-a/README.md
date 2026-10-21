@@ -8,10 +8,10 @@ Le mur part de l'avenir que le Réseau a lui-même écrit, rembobine le temps ju
 
 ## Lancer
 
-Depuis `prototypes/` : `npx vite --port 5174 --strictPort`, puis :
+Depuis `prototypes/` : `npx vite --port 5191 --strictPort`, puis :
 
-- le mur : `http://localhost:5174/concept-a/` (`?scene=2` pour commencer à la scène 2) ;
-- le formulaire : `http://localhost:5174/concept-a/?vue=formulaire`, ou le bouton « Ouvrir le formulaire » du mur, qui l'ouvre dans une fenêtre de la taille d'un téléphone.
+- le mur : `http://localhost:5191/concept-a/` (`?scene=2` pour commencer à la scène 2) ;
+- le formulaire : `http://localhost:5191/concept-a/?vue=formulaire`, ou le bouton « Ouvrir le formulaire » du mur, qui l'ouvre dans une fenêtre de la taille d'un téléphone.
 
 Le formulaire et le mur se parlent par `BroadcastChannel`, sur le même portable, sans réseau (D-051). Commandes de démo (en bas à droite) : pause (aussi la barre d'espace), choix de scène, recadrage sur une moitié du mur (le 32:9 ne fait qu'environ 384 px de haut sur un portable), ouverture du formulaire et effacement des contributions de démo.
 
@@ -53,8 +53,8 @@ Motion 14.0.0 n'est pas utilisé dans ce concept.
 ## Accessibilité
 
 - Bouton pause toujours visible, et barre d'espace (WCAG 2.2.2). Le script de capture vérifie que deux captures prises à 1,2 s d'écart sont identiques pendant la pause.
-- `prefers-reduced-motion` : toutes les durées passent à 0 et les ressorts deviennent linéaires. Le rembobinage est remplacé par l'état final (1976, toutes les cellules visibles, « de 2046 à 1976 »). Les scènes changent sans mouvement et restent pausables (capture `mur-10-mouvement-reduit`).
-- Pas de flash : fond sombre constant et fondus d'au moins 250 ms. Le seul changement rapide est le décompte des années (environ 8 par seconde), sur des chiffres fins, sans variation de luminance d'une grande zone. Pas de son.
+- `prefers-reduced-motion` : toutes les durées passent à 0, ressorts compris (`ressort()` renvoie `{ ease: 'linear', duration: 0 }`, voir itération 2). Le rembobinage est remplacé par l'état final (1976, toutes les cellules visibles, « de 2046 à 1976 »). Les scènes changent sans mouvement et restent pausables (capture `mur-10-mouvement-reduit`).
+- Pas de flash : fond sombre constant et fondus d'au moins 250 ms. Les chiffres qui changent (compteur, tête de lecture) changent au plus 2 fois par seconde, et le compteur de la vedette passe par un fondu (voir itération 2). Pas de son.
 - Contraste AA : texte secondaire #bcc3d8 sur #0a0f1f (environ 11:1), et #4a5068 sur #f7f5f0 dans le formulaire (environ 7:1). Les catégories se distinguent aussi par leur forme (rond, losange, carré, triangle), pas seulement par leur couleur.
 - Formulaire :
   - champs étiquetés, avec un `fieldset` et une `legend` pour le choix fermé ;
@@ -76,10 +76,25 @@ Motion 14.0.0 n'est pas utilisé dans ce concept.
 - Les catégories du choix fermé (relève, rayonnement, régions, Internet de demain) sont une proposition de rédaction. Elles ne sont pas des faits et restent à valider.
 - Les éditions récentes (2018-2026) sont serrées sur l'axe linéaire. Leurs cellules s'étalent vers la gauche avec des traits de rappel, et la lecture de ces traits reste à tester à distance (attente P3).
 - Sur un portable, le mur entier fait environ 384 px de haut. Les textes de cellules sont petits, d'où le bouton « Recadrer ». Une capture à taille réelle (7680 × 2160) reste à faire.
-- Le décompte du rembobinage n'a pas été vérifié avec un outil d'analyse de flashs (PEAT ou équivalent).
+- Le compteur respecte la règle des 3 changements par seconde (mesuré), mais n'a pas été analysé avec PEAT ou un équivalent.
 - Le formulaire et le mur doivent être ouverts dans le même navigateur (BroadcastChannel). Aucun vrai téléphone n'est relié, conformément à D-051.
 - Les commandes de démo recouvrent un coin du mur quand la fenêtre est exactement en 32:9. Elles s'estompent, sauf le bouton pause.
 - Aucun visiteur n'a testé ce prototype (D-036).
+
+## Corrections de l'itération 2
+
+Constats de `etape-4/boucles/equipe-rouge-1.md` (v1.0). Preuves : sortie de `node concept-a/capture.cjs` le 2026-10-21 (serveur `npx vite --port 5191 --strictPort`, Chromium local), console sans erreur ni avertissement, aucune requête hors `localhost:5191`.
+
+| Constat | Correctif | Preuve |
+| --- | --- | --- |
+| A-1 · une contribution retirée réapparaît en vedette | `montrerVedette` ne montre plus une contribution absente de `etat.contribs` ; `cacherVedette` ne la range plus ; `retirer` efface aussitôt la vedette en cours (`etat.vedette`) (`mur.js`) | Deux essais ajoutés à `capture.cjs` : retrait 1 s après l'approbation (le cas de l'équipe rouge) et retrait pendant la vedette, puis relevé du texte du mur toutes les 250 ms pendant 24 s : phrase revue 0 fois dans les deux cas. Capture `concept-a-mur-11-retrait-pendant-vedette.png` |
+| A-2 · mouvement réduit incomplet (durée par défaut de 1 000 ms) | `ressort()` renvoie `{ ease, duration }` et s'étale dans les paramètres (`...ressort()`) ; en mouvement réduit, `duration: 0` | Essai ajouté (`reducedMotion: 'reduce'`) : positions relevées à deux instants, aux moments cités par l'équipe rouge. `.carte-horizon` (0,62 → 1,54 s), `#cerf`, `#releve`, premier `.point` (3,05 → 4,08 s) et `#vedette` : immobiles |
+| A-3 · compteur à environ 7 changements par seconde (WCAG 2.3.1) | Rembobinage : l'année affichée (compteur et tête de lecture) est celle de la tête à des instants espacés de 600 ms du temps de l'animation (`anneeAffichee`, 15 changements en 9 s ; figé en pause). Vedette : fondu (250 ms puis 350 ms) vers l'année du souhait, au lieu du décompte 2026 → année. Total du bilan : affiché d'emblée, sans décompte | Essai ajouté : `MutationObserver` sur `#compteur-annee`, `#tete-annee` et `#total` pendant 36 s (rembobinage complet et trois vedettes) : au plus 2 changements dans toute fenêtre de 1 s (avant : environ 7). Pas d'analyse PEAT |
+| A-4 · identité | « Proposition non officielle · prototype » dans le bandeau du mur (pastille pointillée à côté du nom) et sous l'en-tête du formulaire (en anglais : « Unofficial proposal · prototype ») | Captures `concept-a-mur-1-horizon.png`, `concept-a-formulaire-1-vide.png`, `concept-a-formulaire-6-anglais.png` |
+| A-5 · lisibilité des F-xxx | `.fait-id` passe à `max(.8em, 32px)` (21 → 34 px dans les cellules, 25 → 32 px ailleurs) ; les dates des cellules étaient déjà à 34 px. Le bouton « Recadrer » reste l'outil de la démo | Capture `concept-a-mur-3-editions.png`. Le test P3 à distance réelle reste à faire |
+| T-1 · information du consentement incomplète | Court avis avant les cases : qui recueille (le Réseau ACTION TI, hypothèse à confirmer, D-046), pourquoi, combien de temps (durée à confirmer), comment retirer. Après l'envoi, un code de retrait (`R-XXXX`) s'affiche, marqué simulé ; il reste sur le téléphone et n'est pas transmis au mur | Captures `concept-a-formulaire-3-rempli.png` (avis), `concept-a-formulaire-4-en-attente.png` et `-5-affichee.png` (code) |
+
+Non corrigé à cette itération : la saisie du code de retrait après fermeture de la page (rien ne la reçoit au palier 1 : le code est seulement montré).
 
 ## Fichiers
 

@@ -60,24 +60,23 @@ body.vue-mur { background: #000; color: #fff; height: 100vh; overflow: hidden; f
 .zone-public .public-meta { font-size: 42px; color: var(--ambre-doux); margin-top: 10px; }
 .note-preuve { margin: auto 0 0 1500px; font-size: 40px; color: var(--ambre-doux); }
 
-/* Scène 2 : Web des débuts (codes génériques : fenêtre en relief, gris, liens soulignés) */
-.epoque-web { background: #23474a; color: #fff; }
+/* Scène 2 : Web des débuts (codes génériques : fenêtre en relief, liens soulignés). Itération 2 (C-5) :
+   palette chaude, sans dégradé #000080, sans fond sarcelle ni boutons de fenêtre. */
+.epoque-web { background: #34302b; color: #fff; } /* C-5 : fond brun-gris neutre, plus de sarcelle */
 .fenetre {
-  margin: 0 120px 120px; flex: 1; display: flex; flex-direction: column; background: #c0c0c0; color: #000;
-  border: 10px solid; border-color: #dfdfdf #404040 #404040 #dfdfdf;
+  margin: 0 120px 120px; flex: 1; display: flex; flex-direction: column; background: #e4dccb; color: #000;
+  border: 10px solid; border-color: #f4efe4 #6b6152 #6b6152 #f4efe4;
 }
 .barre-titre {
-  height: 96px; display: flex; align-items: center; justify-content: space-between; padding: 0 30px;
-  background: linear-gradient(to right, #000080, #1a5ea8); color: #fff; font: 700 52px var(--sans);
+  height: 96px; display: flex; align-items: center; padding: 0 30px;
+  background: #5b4636; color: #fff; font: 700 52px var(--sans);
 }
-.barre-titre .cases { display: flex; gap: 12px; }
-.barre-titre .cases i { width: 64px; height: 56px; background: #c0c0c0; border: 6px solid; border-color: #fff #404040 #404040 #fff; }
-.barre-outils { display: flex; gap: 24px; align-items: center; padding: 20px 30px; border-bottom: 4px solid #808080; font: 40px var(--sans); }
-.relief { padding: 10px 30px; border: 6px solid; border-color: #fff #404040 #404040 #fff; }
-.adresse { flex: 1; margin-left: 20px; padding: 10px 24px; background: #fff; border: 6px solid; border-color: #404040 #fff #fff #404040; color: #333; }
-.page { flex: 1; padding: 50px 90px; font-family: var(--serif); overflow: hidden; background: #c0c0c0; }
+.barre-outils { display: flex; gap: 24px; align-items: center; padding: 20px 30px; border-bottom: 4px solid #9a8f7c; font: 40px var(--sans); }
+.relief { padding: 10px 30px; border: 6px solid; border-color: #f4efe4 #6b6152 #6b6152 #f4efe4; }
+.adresse { flex: 1; margin-left: 20px; padding: 10px 24px; background: #fff; border: 6px solid; border-color: #6b6152 #f4efe4 #f4efe4 #6b6152; color: #333; }
+.page { flex: 1; padding: 50px 90px; font-family: var(--serif); overflow: hidden; background: #e4dccb; }
 .nom { margin: 0 0 30px; font: 700 100px/1.2 var(--serif); }
-.morph { color: #000080; }
+.morph { color: #6a2c1a; }
 .curseur-web { display: inline-block; width: 6px; height: .9em; background: #000; vertical-align: -0.1em; margin-left: 6px; }
 .chantier { margin: 0 0 30px; display: inline-block; padding: 16px; background: repeating-linear-gradient(45deg, #000 0 30px, #ffd400 30px 60px); }
 .chantier span { display: block; background: #ffd400; color: #000; font: 700 44px var(--sans); padding: 8px 30px; }
@@ -85,14 +84,14 @@ body.vue-mur { background: #000; color: #fff; height: 100vh; overflow: hidden; f
 .liste-faits li { visibility: hidden; margin-bottom: 14px; }
 .liste-faits li.visible { visibility: visible; }
 .lien { color: #0000ee; text-decoration: underline; font-size: 46px; }
-.page hr { border: 0; border-top: 4px solid #808080; border-bottom: 4px solid #fff; margin: 34px 0; }
+.page hr { border: 0; border-top: 4px solid #9a8f7c; border-bottom: 4px solid #f4efe4; margin: 34px 0; }
 .livre-or h4 { margin: 0 0 12px; font: 700 64px var(--serif); }
 .livre-or p { margin: 0; }
 .livre-or .public-texte { font: italic 74px/1.35 var(--serif); max-width: 4200px; }
 .livre-or .public-meta { font: 42px var(--serif); color: #222; margin-top: 8px; }
-.barre-etat { height: 80px; display: flex; align-items: center; gap: 40px; padding: 0 30px; border-top: 4px solid #808080; font: 40px var(--sans); }
-.progression { width: 700px; height: 44px; border: 6px solid; border-color: #404040 #fff #fff #404040; background: #c0c0c0; }
-.remplissage { display: block; height: 100%; width: 0; background: repeating-linear-gradient(to right, #000080 0 34px, transparent 34px 42px); }
+.barre-etat { height: 80px; display: flex; align-items: center; gap: 40px; padding: 0 30px; border-top: 4px solid #9a8f7c; font: 40px var(--sans); }
+.progression { width: 700px; height: 44px; border: 6px solid; border-color: #6b6152 #f4efe4 #f4efe4 #6b6152; background: #e4dccb; }
+.remplissage { display: block; height: 100%; width: 0; background: #5b4636; }
 
 /* Aujourd'hui : interface actuelle */
 .aujourdhui {
@@ -174,3 +173,23 @@ body.vue-formulaire { background: #eef1f6; color: #111827; font: 16px/1.45 var(-
 .etat { padding: 14px; background: #fff; border: 1px solid #6b7280; border-radius: 10px; }
 .etat p { margin: 0; font-weight: 600; }
 .pied { font-size: 13px; color: #4b5563; margin-top: 18px; }
+
+/* Itération 2 : avis (T-1), cases distinctes (C-2, C-3), phrases envoyées (C-9), retrait par code */
+.non-officiel { display: inline-block; margin: 4px 0 0; padding: 2px 8px; border: 1px solid #4b5563; border-radius: 999px; font-size: 13px; font-weight: 600; color: #374151; }
+.avis h2, .envoyees h2, .retrait-code h2 { margin: 0 0 6px; font-size: 16px; }
+.avis ul { margin: 0; padding-left: 18px; }
+.avis li { margin-bottom: 4px; }
+.consent + .erreur, .consent + .aide { margin-top: 4px; }
+.consent { margin-top: 8px; }
+.code { margin-top: 8px !important; font-weight: 400 !important; }
+.envoyees, .retrait-code { margin-top: 18px; padding: 14px; background: #fff; border: 1px solid #6b7280; border-radius: 10px; }
+.envoyees ul { list-style: none; margin: 0; padding: 0; }
+.envoyees li { padding: 10px 0; border-top: 1px solid #d1d5db; }
+.envoyees li:first-child { border-top: 0; }
+.envoyees .extrait { margin: 0; font-weight: 600; }
+.envoyees li.retiree .extrait { text-decoration: line-through; color: #4b5563; }
+.retrait-code label { display: block; font-weight: 700; margin-bottom: 4px; }
+.ligne-code { display: flex; gap: 8px; align-items: stretch; }
+.ligne-code input { flex: 1; min-width: 0; min-height: 48px; font: 16px var(--mono); padding: 8px 10px; border: 1px solid #6b7280; border-radius: 8px; text-transform: uppercase; }
+.ligne-code .secondaire { width: auto; margin-top: 0; padding: 0 16px; }
+.non-officiel-mur { margin-left: 40px; padding: 4px 24px; border: 3px solid var(--auj-doux); border-radius: 999px; font: 600 36px var(--sans); color: var(--auj-doux); letter-spacing: 0; vertical-align: middle; }

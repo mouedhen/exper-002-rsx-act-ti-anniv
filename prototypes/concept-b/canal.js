@@ -14,13 +14,8 @@ export function ecouter(fn) {
   if (bc) bc.addEventListener('message', (e) => fn(e.data))
 }
 
-// Mémoire de la démo : le navigateur seulement, effaçable d'un bouton (« effacée après la démo »).
-export function lireMemoire() {
-  try { return JSON.parse(localStorage.getItem(CLE) || '[]') } catch { return [] }
-}
-export function ecrireMemoire(liste) {
-  try { localStorage.setItem(CLE, JSON.stringify(liste.slice(-60))) } catch { /* stockage indisponible */ }
-}
-export function effacerMemoire() {
-  try { localStorage.removeItem(CLE) } catch { /* rien */ }
+// Mémoire de la démo : la page du mur seulement (B-6). Rien n'est écrit dans le navigateur ;
+// un rechargement efface tout. On purge aussi la clé laissée par la version précédente.
+export function purgerAncienneMemoire() {
+  try { localStorage.removeItem(CLE) } catch { /* stockage indisponible */ }
 }
