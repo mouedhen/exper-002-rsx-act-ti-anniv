@@ -1,11 +1,13 @@
 // Captures du concept A : mur (1920 × 540), formulaire (360 × 780), vidéo de 15 s du mur.
 // Prérequis : `npx vite --port 5191 --strictPort` lancé depuis prototypes/.
 // Usage : node concept-a/capture.cjs
+// Itération 3 : autre port possible par variable d'environnement, par exemple PORT=5195 node concept-a/capture.cjs.
 const fs = require('fs')
 const path = require('path')
 const { chromium } = require('/opt/node22/lib/node_modules/playwright')
 
-const URL = 'http://localhost:5191/concept-a/'
+const ORIGINE = `http://localhost:${process.env.PORT || '5191'}/`
+const URL = ORIGINE + 'concept-a/'
 const SORTIE = '/mnt/project-files/exp-002/etape-4/captures'
 const pause = (ms) => new Promise((r) => setTimeout(r, ms))
 const erreurs = []
@@ -17,7 +19,7 @@ function surveiller(page, nom) {
   page.on('pageerror', (e) => erreurs.push(`[${nom}] pageerror: ${e.message}`))
   page.on('requestfailed', (r) => erreurs.push(`[${nom}] requête échouée: ${r.url()}`))
   page.on('request', (r) => {
-    if (!r.url().startsWith('http://localhost:5191/')) erreurs.push(`[${nom}] requête externe: ${r.url()}`)
+    if (!r.url().startsWith(ORIGINE)) erreurs.push(`[${nom}] requête externe: ${r.url()}`)
   })
 }
 
@@ -122,7 +124,69 @@ function surveiller(page, nom) {
   }
   await essaiRetrait('PHRASE-RETIREE-A', 1000) // le cas de l'équipe rouge : retrait 1 s après l'approbation
   await essaiRetrait('PHRASE-RETIREE-B', 6500, 'mur-11-retrait-pendant-vedette') // retrait pendant la vedette
+
+  // Itération 3 · N-5 : l'avis ne nomme plus le Réseau comme responsable de la collecte.
+  await tel.goto(URL + '?vue=formulaire')
+  const avisA = await tel.locator('.tel-avis').innerText()
+  const n5 = avisA.includes('Qui recueillerait : l’organisateur (à confirmer, par exemple le Réseau ACTION TI)') && !avisA.includes('Qui recueille :')
+  console.log(`N-5 · avis : « ${avisA.match(/Qui recueill[^.]*\./)?.[0]} » → ${n5 ? 'OK' : 'ÉCHEC'}`)
+
+  // Itération 3 · N-4 : retrait avec le code, depuis une page neuve ; le mur répond (retiré / inconnu).
+  const telN4 = await ctx.newPage()
+  await telN4.setViewportSize({ width: 360, height: 780 })
+  surveiller(telN4, 'formulaire-n4')
+  await telN4.goto(URL + '?vue=formulaire')
+  await telN4.getByLabel('Rayonner au Canada').check()
+  await telN4.getByLabel(/Un mot pour 2046/).fill('PHRASE-CODE-A')
+  await telN4.getByLabel(/J’accepte/).check()
+  await telN4.getByLabel(/14 ans ou plus/).check()
+  await telN4.getByRole('button', { name: 'Envoyer au mur' }).click()
+  await telN4.getByRole('button', { name: /Simuler l’approbation/ }).click()
+  const codeN4 = await telN4.locator('#code-retrait').innerText()
+  const aideCode = await telN4.locator('#statut-code').innerText()
+  await telN4.close()
+  await pause(1500)
+  const telN4b = await ctx.newPage()
+  await telN4b.setViewportSize({ width: 360, height: 780 })
+  surveiller(telN4b, 'formulaire-n4-code')
+  await telN4b.goto(URL + '?vue=formulaire')
+  await telN4b.click('#par-code summary')
+  await telN4b.getByLabel('Code de retrait').fill('R-ZZZZ')
+  await telN4b.getByRole('button', { name: 'Retirer ce souhait' }).click()
+  await telN4b.waitForFunction(() => /Aucun souhait|n’a pas répondu/.test(document.getElementById('etat-code').textContent), null, { timeout: 5000 }).catch(() => {})
+  const etatInconnu = await telN4b.locator('#etat-code').innerText()
+  console.log(`N-4 · code inconnu R-ZZZZ : « ${etatInconnu} » → ${/Aucun souhait ne porte le code R-ZZZZ/.test(etatInconnu) ? 'OK' : 'ÉCHEC'}`)
+  await telN4b.getByLabel('Code de retrait').fill(codeN4.toLowerCase())
+  await telN4b.getByRole('button', { name: 'Retirer ce souhait' }).click()
+  await telN4b.waitForFunction(() => /confirmé|n’a pas répondu/.test(document.getElementById('etat-code').textContent), null, { timeout: 5000 }).catch(() => {})
+  const etatConnu = await telN4b.locator('#etat-code').innerText()
+  await cap(telN4b, 'formulaire-7-retrait-code')
+  let revue = 0
+  for (let i = 0; i < 40; i++) { if ((await mur.locator('#stage').innerText()).includes('PHRASE-CODE-A')) revue++; await pause(250) }
+  console.log(`N-4 · code ${codeN4} saisi sur une page neuve : « ${etatConnu} », phrase revue ${revue} fois en 10 s → ${/Retrait confirmé par le mur/.test(etatConnu) && revue === 0 ? 'OK' : 'ÉCHEC'}`)
+  console.log(`N-4 · aide du code : « ${aideCode.replace(/\s+/g, ' ')} » → ${aideCode.includes('tant que le mur reste ouvert') ? 'OK' : 'ÉCHEC'}`)
   await ctx.close()
+
+  // Itération 3 · N-6 : « Proposition non officielle · prototype » visible dans les trois recadrages (1366 × 768).
+  const ctxM = await navigateur.newContext({ viewport: { width: 1366, height: 768 } })
+  const pm = await ctxM.newPage()
+  surveiller(pm, 'recadrages')
+  await pm.goto(URL)
+  await pause(1500)
+  const vues = []
+  for (let i = 0; i < 3; i++) {
+    const nom = (await pm.locator('#b-recadrer').innerText()).replace('Recadrer : ', '')
+    const visible = await pm.evaluate(() => [...document.querySelectorAll('.mention-commandes, .marque-mention')].some((n) => {
+      const r = n.getBoundingClientRect()
+      return /Proposition non officielle/.test(n.textContent) && r.width > 0 && r.left >= 0 && r.top >= 0 && r.right <= innerWidth && r.bottom <= innerHeight && parseFloat(getComputedStyle(n).opacity) >= 0.9
+    }))
+    vues.push(`${nom} ${visible ? 'oui' : 'NON'}`)
+    if (nom.includes('droite')) await cap(pm, 'mur-12-recadre-droite-1366')
+    await pm.locator('#b-recadrer').click()
+    await pause(300)
+  }
+  console.log(`N-6 · mention dans la fenêtre : ${vues.join(', ')} → ${vues.every((v) => v.endsWith('oui')) ? 'OK' : 'ÉCHEC'}`)
+  await ctxM.close()
 
   // Compteurs (constat A-3, WCAG 2.3.1) : au plus 3 changements de chiffres par seconde, rembobinage et vedettes.
   const ctxC = await navigateur.newContext({ viewport: { width: 1920, height: 540 } })

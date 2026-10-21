@@ -94,7 +94,17 @@ Constats de `etape-4/boucles/equipe-rouge-1.md` (v1.0). Preuves : sortie de `nod
 | A-5 · lisibilité des F-xxx | `.fait-id` passe à `max(.8em, 32px)` (21 → 34 px dans les cellules, 25 → 32 px ailleurs) ; les dates des cellules étaient déjà à 34 px. Le bouton « Recadrer » reste l'outil de la démo | Capture `concept-a-mur-3-editions.png`. Le test P3 à distance réelle reste à faire |
 | T-1 · information du consentement incomplète | Court avis avant les cases : qui recueille (le Réseau ACTION TI, hypothèse à confirmer, D-046), pourquoi, combien de temps (durée à confirmer), comment retirer. Après l'envoi, un code de retrait (`R-XXXX`) s'affiche, marqué simulé ; il reste sur le téléphone et n'est pas transmis au mur | Captures `concept-a-formulaire-3-rempli.png` (avis), `concept-a-formulaire-4-en-attente.png` et `-5-affichee.png` (code) |
 
-Non corrigé à cette itération : la saisie du code de retrait après fermeture de la page (rien ne la reçoit au palier 1 : le code est seulement montré).
+Non corrigé à cette itération : la saisie du code de retrait après fermeture de la page (rien ne la reçoit au palier 1 : le code est seulement montré). Corrigé à l'itération 3 (N-4, ci-dessous).
+
+## Corrections de l'itération 3
+
+Constats mineurs de `etape-4/boucles/equipe-rouge-2.md` (v1.0). Preuves : sortie de `PORT=5195 node concept-a/capture.cjs` le 2026-10-21 (serveur `npx vite --port 5195 --strictPort` ; sans `PORT`, le script garde le port 5191 documenté), console sans erreur ni avertissement, aucune requête hors de localhost. `package.json` et les dépendances sont inchangés (N-7 laissé à la décision de Chams).
+
+| Constat | Correctif | Preuve |
+| --- | --- | --- |
+| N-4 · code de retrait inerte | Section « Retirer avec un code » au bas du formulaire, sur le modèle de B (en français et en anglais). Le code `R-XXXX` part maintenant au mur avec la contribution approuvée (le mur le garde sans l'afficher) ; le mur répond `retiree` ou `inconnu` à un message `retrait-code`, et le formulaire n'annonce le retrait qu'à cette réponse (« Retrait confirmé par le mur (R-XXXX). » ou « Aucun souhait ne porte le code … sur le mur. » ; sans réponse en 3 s : « Le mur n'a pas répondu »). L'avis et l'aide du code précisent « (démo : tant que le mur reste ouvert) ». | Essai ajouté : code inconnu R-ZZZZ → « Aucun souhait ne porte le code R-ZZZZ sur le mur. » ; code réel saisi sur une page neuve → « Retrait confirmé par le mur », phrase revue 0 fois en 10 s. `concept-a-formulaire-7-retrait-code.png` |
+| N-5 · l'avis nomme le Réseau | « Qui recueillerait : l'organisateur (à confirmer, par exemple le Réseau ACTION TI). » (anglais : « Who would collect it: the organizer (to be confirmed, for example Réseau ACTION TI). ») | Avis lu à l'exécution |
+| N-6 · mention absente en moitié droite | « Proposition non officielle · prototype » ajoutée à la barre de commandes, à pleine opacité (exemptée de l'effacement à demi). | À 1366 × 768, mention dans la fenêtre en mur entier, moitié gauche et moitié droite. `concept-a-mur-12-recadre-droite-1366.png` |
 
 ## Fichiers
 

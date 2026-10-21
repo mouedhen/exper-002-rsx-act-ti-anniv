@@ -91,3 +91,15 @@ Constats de l'[équipe rouge 1](/mnt/project-files/exp-002/etape-4/boucles/equip
 | T-1 · information incomplète | Avis court et marqué simulé : qui recueille (« le Réseau ACTION TI (hypothèse, à confirmer) »), pourquoi, combien de temps, comment retirer. Code de retrait affiché après l'envoi, utilisable depuis une page neuve (« Retirer une phrase avec son code »). « Proposition non officielle · prototype » au formulaire et au mur. | Avis complet, mention présente aux deux endroits, code affiché ; retrait par ce code depuis une page de formulaire neuve : oui. `concept-c-formulaire.png` |
 
 Reste ouvert : l'accord parental (pas de parcours sous 14 ans), la durée réelle d'affichage et le responsable, à fixer avec le Réseau (D-046) ; un code de retrait qui survive à la fermeture du mur demande un registre (palier 2).
+
+## Corrections de l'itération 3
+
+*2026-10-21, d'après [equipe-rouge-2.md](/mnt/project-files/exp-002/etape-4/boucles/equipe-rouge-2.md). Preuves : sortie de `PORT=5195 node concept-c/capture.cjs` (serveur `npx vite --port 5195 --strictPort` ; sans `PORT`, le script garde le port 5193 documenté), 18 cas sur 18 « OK » (13 de l’itération 2, 5 nouveaux), console sans erreur ni avertissement, aucune requête hors de localhost. `package.json` et les dépendances sont inchangés (N-7 laissé à la décision de Chams).*
+
+| Constat | Correctif | Preuve |
+| --- | --- | --- |
+| N-2 · fausse confirmation de retrait | Le mur répond à chaque message `retrait` : `retiree` (la phrase était au mur, en voyage ou en file de pause) ou `inconnu`. Le formulaire n'écrit « retirée » qu'à la réponse `retiree` (« Retrait confirmé par le mur (C-XXXX). ») ; sur `inconnu` : « Aucune phrase ne porte le code C-XXXX sur le mur. » ; sans réponse en 3 s : « Le mur n'a pas répondu ». | `mur.js`, `retirer()` ; `formulaire.js`, `surReponse()`. Essais : C-ZZZZ → « Aucune phrase ne porte le code C-ZZZZ sur le mur. », aucun « retirée » ; code réel saisi sur une page neuve → réponse `retiree`, « Retrait confirmé par le mur », phrase retirée. |
+| N-3 · promesse trop large du code | « … même après avoir fermé cette page (démo : tant que le mur reste ouvert). » | Texte lu après l'envoi. `concept-c-formulaire-retraits.png` |
+| N-5 · l'avis nomme le Réseau | « Qui recueillerait : l'organisateur (à confirmer, par exemple le Réseau ACTION TI). Ici, personne : c'est une démo hors ligne. » | Avis lu à l'exécution. `concept-c-formulaire.png` |
+| N-6 · mention hors cadre en vue « époques » | « Proposition non officielle · prototype » ajoutée à la barre de commandes (hors du mur, toujours dans la fenêtre). | À 1366 × 768, mention dans la fenêtre en mur entier, époques et aujourd'hui. `concept-c-mur-1366-recadre-epoques.png` |
+

@@ -1,12 +1,13 @@
 // Captures et cas de test du concept C : mur (1920 × 540 et 1366 × 768), formulaire (360 × 780), vidéo du mur (~15 s).
 // Itération 2 : un cas de test par constat de l'équipe rouge 1 (C-1 à C-9, T-1), plus D-051 et la console.
 // Prérequis : `npx vite --port 5193 --strictPort` lancé depuis prototypes/.
+// Itération 3 : autre port possible par variable d'environnement, par exemple PORT=5195 node concept-c/capture.cjs.
 const { chromium } = require('/opt/node22/lib/node_modules/playwright')
 const fs = require('fs')
 const path = require('path')
 const { lireReference, IDS } = require('./extraire-faits.cjs')
 
-const ORIGINE = 'http://localhost:5193'
+const ORIGINE = `http://localhost:${process.env.PORT || '5193'}`
 const URL = ORIGINE + '/concept-c/'
 const SORTIE = '/mnt/project-files/exp-002/etape-4/captures'
 const VIDEO_TMP = path.join(__dirname, '.video-tmp')
@@ -208,7 +209,8 @@ const verifier = (constat, ok, detail) => verifs.push({ constat, ok: !!ok, detai
   // T-1 : avis complet, mention non officielle, code de retrait utilisable depuis une page neuve.
   const avis = await f.textContent('.avis')
   const entete = await f.textContent('header')
-  const codeT = (await f.textContent('#code-texte')).match(/C-[A-Z2-9]{4}/)?.[0]
+  const codeTexteF = await f.textContent('#code-texte')
+  const codeT = codeTexteF.match(/C-[A-Z2-9]{4}/)?.[0]
   await f.close()
   const f2 = await ouvrir(ctx5, 'formulaire-code', URL + '?vue=formulaire', TEL)
   await f2.fill('#code', codeB)
@@ -216,10 +218,37 @@ const verifier = (constat, ok, detail) => verifs.push({ constat, ok: !!ok, detai
   await mur5.waitForFunction((c) => !window.__murC.contributions().includes(c), codeB, { timeout: 3000 }).catch(() => {})
   const parCode = !(await mur5.evaluate(() => window.__murC.contributions())).includes(codeB)
   const mentionMur = await mur5.textContent('.non-officiel-mur')
-  const elements = ['Réseau ACTION TI (hypothèse, à confirmer)', 'Pourquoi', 'Combien de temps', 'Comment retirer', 'code de retrait', 'simulé']
+  const elements = ['Qui recueillerait', 'organisateur (à confirmer, par exemple le Réseau ACTION TI)', 'Pourquoi', 'Combien de temps', 'Comment retirer', 'code de retrait', 'simulé']
   const manquants = elements.filter((e) => !avis.includes(e))
   verifier('T-1', !manquants.length && entete.includes('Proposition non officielle · prototype') && mentionMur.includes('Proposition non officielle') && codeT === codeB && parCode,
     `avis : ${manquants.length ? 'manque ' + manquants.join(', ') : 'qui, pourquoi, combien de temps, comment retirer'} ; mention non officielle au formulaire et au mur ; code affiché après l'envoi (${codeT}) ; retrait par ce code depuis une page neuve : ${parCode ? 'oui' : 'NON'}`)
+  // N-5 (itération 3) : l'avis ne nomme plus le Réseau comme responsable de la collecte.
+  verifier('N-5', avis.includes("Qui recueillerait : l'organisateur (à confirmer, par exemple le Réseau ACTION TI)") && !avis.includes('Qui recueille :'),
+    `avis : « ${avis.match(/Qui recueill[^.]*\./)?.[0]} »`)
+  // N-3 (itération 3) : la promesse du code est bornée à la démo.
+  verifier('N-3', codeTexteF.includes('(démo : tant que le mur reste ouvert)'), `après l'envoi : « ${codeTexteF.trim()} »`)
+  // N-2 (itération 3) : un code inconnu n'est jamais annoncé comme retiré ; le mur répond « inconnu ».
+  await f2.fill('#code', 'C-ZZZZ')
+  await f2.click('#retirer-code')
+  await f2.waitForFunction(() => /Aucune phrase|n'a pas répondu/.test(document.getElementById('code-etat').textContent), null, { timeout: 5000 }).catch(() => {})
+  const etatInconnu = await f2.textContent('#code-etat')
+  const etatTexteInconnu = await f2.textContent('#etat-texte')
+  verifier('N-2', /Aucune phrase ne porte le code C-ZZZZ sur le mur/.test(etatInconnu) && !/C-ZZZZ a été retirée/.test(etatTexteInconnu),
+    `code inconnu C-ZZZZ : « ${etatInconnu} » ; « C-ZZZZ a été retirée » affiché : ${/C-ZZZZ a été retirée/.test(etatTexteInconnu) ? 'OUI' : 'non'}`)
+  // N-2 : un code connu n'est dit « retiré » qu'à la réponse du mur (en pause, le mur répond quand même).
+  const fN2 = await ouvrir(ctx5, 'formulaire-n2', URL + '?vue=formulaire', TEL)
+  const codeN2 = await envoyer(fN2, 'PHRASE-N2-C')
+  await attendreSurMur(mur5, codeN2)
+  await mur5.evaluate(() => { window.__reponses = []; new BroadcastChannel('concept-c-contributions').addEventListener('message', (e) => { if (e.data?.type === 'retiree' || e.data?.type === 'inconnu') window.__reponses.push(e.data) }) })
+  const f3 = await ouvrir(ctx5, 'formulaire-code-2', URL + '?vue=formulaire', TEL)
+  await f3.fill('#code', codeN2)
+  await f3.click('#retirer-code')
+  await f3.waitForFunction(() => /confirmé/.test(document.getElementById('code-etat').textContent), null, { timeout: 5000 }).catch(() => {})
+  const etatConnu = await f3.textContent('#code-etat')
+  const reponses = await mur5.evaluate(() => window.__reponses)
+  const sorti = !(await mur5.evaluate(() => window.__murC.contributions())).includes(codeN2)
+  verifier('N-2', /Retrait confirmé par le mur/.test(etatConnu) && sorti && reponses.some((m) => m.type === 'retiree' && m.id === codeN2),
+    `code connu ${codeN2} saisi sur une page neuve : réponse du mur « ${reponses.map((m) => m.type).join(', ')} », formulaire « ${etatConnu} », phrase retirée : ${sorti ? 'oui' : 'NON'}`)
   await ctx5.close()
 
   console.log('étape 6')
@@ -261,15 +290,23 @@ const verifier = (constat, ok, detail) => verifs.push({ constat, ok: !!ok, detai
   const entierA = await mesurer(SEL_AUJ)
   await p7.click('#btn-vue')
   await attendre(200)
+  const mentionVisible = () => p7.evaluate(() => {
+    const m = [...document.querySelectorAll('.mention-commandes, .non-officiel-mur')].filter((n) => /Proposition non officielle/.test(n.textContent))
+    return m.some((n) => { const r = n.getBoundingClientRect(); return r.width > 0 && r.left >= 0 && r.top >= 0 && r.right <= innerWidth && r.bottom <= innerHeight && getComputedStyle(n).visibility !== 'hidden' })
+  })
+  const vues6 = { 'mur entier': await mentionVisible() }
   const recE = await mesurer(SEL_EPOQUES)
   await p7.screenshot({ path: path.join(SORTIE, 'concept-c-mur-1366-recadre-epoques.png') })
+  vues6['époques'] = await mentionVisible()
   await p7.click('#btn-vue')
   await attendre(200)
   const recA = await mesurer(SEL_AUJ)
+  vues6["aujourd'hui"] = await mentionVisible()
   await p7.screenshot({ path: path.join(SORTIE, 'concept-c-mur-1366-recadre-aujourdhui.png') })
   const f1 = (n) => n.toFixed(1).replace('.', ',')
   verifier('C-7', recE.min >= 10.5 && recA.min >= 10.5,
     `1366 × 768, plus petit texte des sources : mur entier ${f1(Math.min(entierE.min, entierA.min))} px ; vue « époques » ${f1(recE.min)} px (× ${f1(recE.echelle / entierE.echelle)}) ; vue « aujourd'hui » ${f1(recA.min)} px (× ${f1(recA.echelle / entierA.echelle)})`)
+  verifier('N-6', Object.values(vues6).every(Boolean), `1366 × 768, « Proposition non officielle · prototype » dans la fenêtre : ${Object.entries(vues6).map(([k, v]) => `${k} ${v ? 'oui' : 'NON'}`).join(', ')}`)
   await ctx7.close()
 
   console.log('étape 8')

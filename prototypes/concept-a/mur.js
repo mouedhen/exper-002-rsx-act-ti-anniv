@@ -184,6 +184,7 @@ function construire(racine) {
     <button id="b-formulaire" type="button">Ouvrir le formulaire</button>
     <button id="b-effacer" type="button">Effacer la démo</button>
     <span id="etat-commandes" role="status"></span>
+    <span class="mention-commandes">Proposition non officielle · prototype</span>
   </div>`
 }
 
@@ -601,8 +602,14 @@ function recevoir(msg) {
     scene2(c)
   } else if (msg?.type === 'retrait') {
     retirer(msg.id)
+  } else if (msg?.type === 'retrait-code' && typeof msg.code === 'string') {
+    // N-4 (itération 3) : retrait par code depuis n'importe quelle page du formulaire ; le mur répond.
+    const c = etat.contribs.find((x) => !x.simule && x.code === msg.code)
+    if (c) retirer(c.id)
+    canalMur.envoyer({ type: c ? 'retiree' : 'inconnu', code: msg.code })
   }
 }
+let canalMur = null
 
 function retirer(id) {
   const i = etat.contribs.findIndex((c) => c.id === id)
@@ -719,7 +726,7 @@ export function demarrerMur(racine) {
   ajuster()
   addEventListener('resize', ajuster)
   brancherCommandes()
-  ouvrirCanal(recevoir)
+  canalMur = ouvrirCanal(recevoir)
   const depart = new URLSearchParams(location.search).get('scene')
   depart === '2' ? scene2() : scene1()
 }

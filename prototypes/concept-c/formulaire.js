@@ -25,7 +25,7 @@ export function monterFormulaire(app) {
     <section class="avis" aria-labelledby="avis-titre">
       <h2 id="avis-titre">Avant d'écrire (avis simulé)</h2>
       <ul>
-        <li><strong>Qui recueille :</strong> le Réseau ACTION TI (hypothèse, à confirmer). Ici, personne : c'est une démo hors ligne.</li>
+        <li><strong>Qui recueillerait :</strong> l'organisateur (à confirmer, par exemple le Réseau ACTION TI). Ici, personne : c'est une démo hors ligne.</li>
         <li><strong>Pourquoi :</strong> afficher votre phrase sur le mur des 50 ans, rien d'autre.</li>
         <li><strong>Combien de temps :</strong> pendant la démo seulement ; la phrase reste sur ce portable et s'efface à la fin. Au palier 2 : pendant l'événement, puis effacée.</li>
         <li><strong>Comment retirer :</strong> avec le bouton « Retirer » après l'envoi, ou plus tard avec le code de retrait affiché après l'envoi (en bas de cette page, ou auprès de l'équipe du stand).</li>
@@ -88,7 +88,7 @@ export function monterFormulaire(app) {
   <p class="pied">Au palier 2, une personne validerait chaque phrase avant l'affichage. Ici, la validation est simulée.</p>
 </main>`
 
-  const canal = ouvrirCanal()
+  const canal = ouvrirCanal((m) => surReponse(m))
   const $ = (id) => document.getElementById(id)
   const form = $('form')
   const texte = $('texte')
@@ -129,15 +129,33 @@ export function monterFormulaire(app) {
     envoyees.hidden = false
   }
 
+  // N-2 (itération 3) : « retirée » n'est affiché qu'à la réponse du mur (retiree ou inconnu), comme en B.
+  const delais = new Map()
   function retirer(id) {
     canal.postMessage({ type: 'retrait', id })
+    clearTimeout(delais.get(id))
+    delais.set(id, setTimeout(() => {
+      delais.delete(id)
+      $('code-etat').textContent = `Le mur n'a pas répondu pour ${id} : ouvrez-le sur ce portable.`
+    }, 3000))
+  }
+  function surReponse(msg) {
+    if (!msg || (msg.type !== 'retiree' && msg.type !== 'inconnu')) return
+    const id = String(msg.id)
+    if (!delais.has(id)) return // réponse à une autre page
+    clearTimeout(delais.get(id)); delais.delete(id)
+    if (msg.type === 'inconnu') {
+      $('code-etat').textContent = `Aucune phrase ne porte le code ${id} sur le mur.`
+      return
+    }
     const li = listeEnvoyees.querySelector(`[data-id="${CSS.escape(id)}"]`)
-    if (li) {
+    if (li && !li.classList.contains('retiree')) {
       li.classList.add('retiree')
-      li.querySelector('button').remove()
+      li.querySelector('button')?.remove()
       li.insertAdjacentHTML('beforeend', '<p class="aide"><strong>Retirée du mur.</strong></p>')
     }
     etatTexte.textContent = `La phrase ${id} a été retirée du mur.`
+    $('code-etat').textContent = `Retrait confirmé par le mur (${id}).`
   }
 
   form.addEventListener('submit', (e) => {
@@ -164,7 +182,7 @@ export function monterFormulaire(app) {
     setTimeout(() => {
       canal.postMessage(contribution)
       etatTexte.textContent = 'Validée (modération simulée) : votre phrase est sur le mur, marquée « simulée ».'
-      codeTexte.innerHTML = `Votre code de retrait : <strong>${esc(id)}</strong>. Notez-le : il permet de retirer la phrase même après avoir fermé cette page.`
+      codeTexte.innerHTML = `Votre code de retrait : <strong>${esc(id)}</strong>. Notez-le : il permet de retirer la phrase même après avoir fermé cette page (démo : tant que le mur reste ouvert).`
       codeTexte.hidden = false
       ajouterEnvoyee(id, contribution.texte)
       btnEncore.hidden = false

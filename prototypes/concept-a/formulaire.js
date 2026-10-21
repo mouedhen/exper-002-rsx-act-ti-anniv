@@ -13,13 +13,22 @@ const T = {
     marque: 'Réseau ACTION TI · 50 années',
     mention: 'Proposition non officielle · prototype',
     avisTitre: 'Avant d’envoyer : vos renseignements',
-    avisQui: '<b>Qui recueille :</b> le Réseau ACTION TI (hypothèse, à confirmer).',
+    avisQui: '<b>Qui recueillerait :</b> l’organisateur (à confirmer, par exemple le Réseau ACTION TI).',
     avisPourquoi: '<b>Pourquoi :</b> afficher votre souhait sur le mur du 50<sup>e</sup>, rien d’autre. Ni nom ni courriel ne sont demandés.',
     avisDuree: '<b>Combien de temps :</b> pendant l’événement seulement (durée à confirmer), ou jusqu’en 2046 si vous cochez la capsule. En démo, tout est effacé à la fin.',
-    avisRetrait: '<b>Comment retirer :</b> le bouton « Retirer ma contribution » après l’envoi, ou plus tard avec le code de retrait affiché après l’envoi.',
+    avisRetrait: '<b>Comment retirer :</b> le bouton « Retirer ma contribution » après l’envoi, ou plus tard avec le code de retrait affiché après l’envoi, dans « Retirer avec un code » (démo : tant que le mur reste ouvert).',
     avisSimule: 'Démo : cet avis et le code de retrait sont simulés.',
     codeTitre: 'Votre code de retrait :',
-    codeAide: 'Notez-le : il servirait à retirer votre souhait après avoir fermé cette page. Simulé : en démo, ce code n’est relié à aucun service.',
+    codeAide: 'Notez-le : il permet de retirer votre souhait même après avoir fermé cette page, dans « Retirer avec un code » (démo : tant que le mur reste ouvert).',
+    parCode: 'Retirer avec un code',
+    codeLabel: 'Code de retrait',
+    codeExemple: 'Le code affiché après l’envoi, par exemple R-7K3Q (démo : tant que le mur reste ouvert).',
+    codeBouton: 'Retirer ce souhait',
+    codeForme: 'Ce code n’a pas la bonne forme (R- suivi de 4 caractères).',
+    codeEnvoye: 'Demande de retrait envoyée au mur.',
+    codeConfirme: (c) => `Retrait confirmé par le mur (${c}).`,
+    codeInconnu: (c) => `Aucun souhait ne porte le code ${c} sur le mur.`,
+    codeMuet: 'Le mur n’a pas répondu : ouvrez-le sur ce portable.',
     titre: '2046 : écrivez la suite',
     intro: 'Le mur affiche, de 2027 à 2046, les souhaits approuvés par un modérateur. 30 secondes.',
     demo: 'Démo hors ligne : rien ne quitte ce portable. Ce que vous saisissez est effacé après la démo.',
@@ -58,13 +67,22 @@ const T = {
     marque: 'Réseau ACTION TI · 50 years',
     mention: 'Unofficial proposal · prototype',
     avisTitre: 'Before you send: your information',
-    avisQui: '<b>Who collects it:</b> Réseau ACTION TI (assumption, to be confirmed).',
+    avisQui: '<b>Who would collect it:</b> the organizer (to be confirmed, for example Réseau ACTION TI).',
     avisPourquoi: '<b>Why:</b> to show your wish on the 50th anniversary wall, nothing else. No name or email is asked for.',
     avisDuree: '<b>How long:</b> during the event only (length to be confirmed), or until 2046 if you tick the time capsule. In the demo, everything is erased at the end.',
-    avisRetrait: '<b>How to withdraw:</b> the “Withdraw my contribution” button after sending, or later with the withdrawal code shown after sending.',
+    avisRetrait: '<b>How to withdraw:</b> the “Withdraw my contribution” button after sending, or later with the withdrawal code shown after sending, under “Withdraw with a code” (demo: while the wall stays open).',
     avisSimule: 'Demo: this notice and the withdrawal code are simulated.',
     codeTitre: 'Your withdrawal code:',
-    codeAide: 'Write it down: it would let you withdraw your wish after closing this page. Simulated: in the demo, this code is not linked to any service.',
+    codeAide: 'Write it down: it lets you withdraw your wish even after closing this page, under “Withdraw with a code” (demo: while the wall stays open).',
+    parCode: 'Withdraw with a code',
+    codeLabel: 'Withdrawal code',
+    codeExemple: 'The code shown after sending, for example R-7K3Q (demo: while the wall stays open).',
+    codeBouton: 'Withdraw this wish',
+    codeForme: 'This code is not in the right form (R- followed by 4 characters).',
+    codeEnvoye: 'Withdrawal request sent to the wall.',
+    codeConfirme: (c) => `Withdrawal confirmed by the wall (${c}).`,
+    codeInconnu: (c) => `No wish on the wall has the code ${c}.`,
+    codeMuet: 'The wall did not answer: open it on this laptop.',
     titre: '2046: write what comes next',
     intro: 'From 2027 to 2046, the wall shows the wishes a moderator has approved. 30 seconds.',
     demo: 'Offline demo: nothing leaves this laptop. What you type is erased after the demo.',
@@ -101,7 +119,18 @@ const T = {
 
 let langue = 'fr'
 let derniere = null
-const canal = ouvrirCanal()
+// N-4 (itération 3) : le mur répond à un retrait par code (retiree ou inconnu), comme en B.
+let codeDemande = null
+let delaiCode = null
+const canal = ouvrirCanal((m) => {
+  if (!codeDemande || m?.code !== codeDemande || (m.type !== 'retiree' && m.type !== 'inconnu')) return
+  clearTimeout(delaiCode)
+  const t = T[langue]
+  const etat = document.getElementById('etat-code')
+  if (etat) etat.textContent = m.type === 'retiree' ? t.codeConfirme(m.code) : t.codeInconnu(m.code)
+  if (m.type === 'retiree' && derniere?.code === m.code) montrerStatut(document, 'retiree')
+  codeDemande = null
+})
 
 function gabarit(t) {
   const annees = []
@@ -165,6 +194,17 @@ function gabarit(t) {
       <button type="button" class="bouton bouton-second" id="b-retirer">${t.retirer}</button>
       <button type="button" class="bouton bouton-second" id="b-autre" hidden>${t.recommencer}</button>
     </section>
+
+    <details class="par-code" id="par-code">
+      <summary>${t.parCode}</summary>
+      <form id="form-code" novalidate>
+        <label class="etiquette" for="code">${t.codeLabel}</label>
+        <input id="code" name="code" autocomplete="off" autocapitalize="characters" spellcheck="false" aria-describedby="aide-code">
+        <p class="aide" id="aide-code">${t.codeExemple}</p>
+        <button type="submit" class="bouton bouton-second">${t.codeBouton}</button>
+        <p class="etat-code" id="etat-code" aria-live="polite"></p>
+      </form>
+    </details>
   </main>`
 }
 
@@ -212,12 +252,23 @@ function rendre(racine) {
   })
 
   racine.querySelector('#b-approuver').addEventListener('click', () => {
-    canal.envoyer({ type: 'approuvee', contribution: { ...derniere, code: undefined } }) // le code reste sur le téléphone
+    canal.envoyer({ type: 'approuvee', contribution: { ...derniere } }) // le mur garde le code pour le retrait (N-4), sans l'afficher
     montrerStatut(racine, 'affichee')
   })
   racine.querySelector('#b-retirer').addEventListener('click', () => {
     if (derniere) canal.envoyer({ type: 'retrait', id: derniere.id })
     montrerStatut(racine, 'retiree')
+  })
+  racine.querySelector('#form-code').addEventListener('submit', (e) => {
+    e.preventDefault()
+    const code = racine.querySelector('#code').value.trim().toUpperCase()
+    const etat = racine.querySelector('#etat-code')
+    if (!/^R-[A-Z0-9]{4}$/.test(code)) { etat.textContent = t.codeForme; return }
+    codeDemande = code
+    canal.envoyer({ type: 'retrait-code', code })
+    etat.textContent = t.codeEnvoye
+    clearTimeout(delaiCode)
+    delaiCode = setTimeout(() => { if (codeDemande === code) { etat.textContent = t.codeMuet; codeDemande = null } }, 3000)
   })
   racine.querySelector('#b-autre').addEventListener('click', () => {
     derniere = null

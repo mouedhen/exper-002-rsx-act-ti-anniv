@@ -51,10 +51,10 @@ export function monterFormulaire(racine, params) {
       <section class="avis" id="avis" aria-labelledby="avis-t">
         <h2 id="avis-t">3. Avant de transmettre : vos renseignements</h2>
         <ul>
-          <li><b>Qui recueille :</b> le Réseau ACTION TI (hypothèse, à confirmer).</li>
+          <li><b>Qui recueillerait :</b> l'organisateur (à confirmer, par exemple le Réseau ACTION TI).</li>
           <li><b>Pourquoi :</b> afficher votre phrase sur le mur de la JIQ, rien d'autre. Ni nom ni courriel ne sont demandés.</li>
           <li><b>Combien de temps :</b> pendant l'événement seulement (durée à confirmer). En démo, la phrase disparaît au rechargement du mur.</li>
-          <li><b>Comment retirer :</b> le bouton « Retirer ma phrase » après l'envoi, ou plus tard avec le code de retrait affiché après l'envoi.</li>
+          <li><b>Comment retirer :</b> le bouton « Retirer ma phrase » après l'envoi, ou plus tard avec le code de retrait affiché après l'envoi (démo : tant que le mur reste ouvert).</li>
         </ul>
         <p class="avis-simule">Démo : cet avis et le code de retrait sont simulés.</p>
       </section>
@@ -82,7 +82,7 @@ export function monterFormulaire(racine, params) {
       <form id="form-code" novalidate>
         <label for="code">Code de retrait</label>
         <input id="code" name="code" autocomplete="off" autocapitalize="characters" spellcheck="false" aria-describedby="aide-code">
-        <p class="aide" id="aide-code">Le code affiché après l'envoi, par exemple B-7K3Q.</p>
+        <p class="aide" id="aide-code">Le code affiché après l'envoi, par exemple B-7K3Q (démo : tant que le mur reste ouvert).</p>
         <button type="submit" class="retirer">Retirer cette phrase</button>
         <p class="etat-code" id="etat-code" aria-live="polite"></p>
       </form>
@@ -116,7 +116,7 @@ export function monterFormulaire(racine, params) {
     listeEnvois.innerHTML = [...envois].map(([code, e]) => `
       <li class="envoi" data-code="${code}">
         <p class="envoi-texte">« ${echapper(e.texte)} »</p>
-        <p class="envoi-code">Code de retrait : <strong class="code">${code}</strong></p>
+        <p class="envoi-code">Code de retrait : <strong class="code">${code}</strong> (démo : tant que le mur reste ouvert)</p>
         ${e.statut === 'retiree'
           ? '<p class="envoi-statut">Retirée : elle n\'est plus sur le mur.</p>'
           : `<button type="button" class="retirer" data-code="${code}">Retirer ma phrase</button>`}

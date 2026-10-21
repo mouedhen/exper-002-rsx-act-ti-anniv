@@ -98,6 +98,7 @@ function gabarit() {
   <button type="button" id="btn-vue" aria-live="polite">Vue : mur entier</button>
   <a href="?vue=formulaire" target="_blank" rel="noopener" id="lien-form">Formulaire (téléphone)</a>
   <span class="indic" id="indic" role="status"></span>
+  <span class="mention-commandes">Proposition non officielle · prototype</span>
 </div>`,
   }
 }
@@ -357,6 +358,7 @@ export function monterMur(app) {
     })
   }
 
+  let canalMur = null
   function retirer(id) {
     // Une phrase encore en file d'attente (pause) est simplement oubliée (C-6).
     const j = file.findIndex((m) => String(m.id) === id)
@@ -371,6 +373,8 @@ export function monterMur(app) {
       voyages.delete(id)
     }
     const i = contributions.findIndex((c) => c.id === id)
+    // N-2 (itération 3) : le mur répond au formulaire (retiree ou inconnu).
+    canalMur.postMessage({ type: (j >= 0 || v || i >= 0) ? 'retiree' : 'inconnu', id })
     if (i < 0) return
     contributions.splice(i, 1)
     liste.querySelector(`[data-id="${CSS.escape(id)}"]`)?.remove()
@@ -393,7 +397,7 @@ export function monterMur(app) {
     a.forEach(recevoirAjout)
   }
 
-  ouvrirCanal((msg) => {
+  canalMur = ouvrirCanal((msg) => {
     if (!msg || typeof msg !== 'object') return
     if (msg.type === 'ajout' && typeof msg.texte === 'string') {
       if (enPause) { file.push(msg); majPause(); return }

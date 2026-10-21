@@ -193,3 +193,6 @@ body.vue-formulaire { background: #eef1f6; color: #111827; font: 16px/1.45 var(-
 .ligne-code input { flex: 1; min-width: 0; min-height: 48px; font: 16px var(--mono); padding: 8px 10px; border: 1px solid #6b7280; border-radius: 8px; text-transform: uppercase; }
 .ligne-code .secondaire { width: auto; margin-top: 0; padding: 0 16px; }
 .non-officiel-mur { margin-left: 40px; padding: 4px 24px; border: 3px solid var(--auj-doux); border-radius: 999px; font: 600 36px var(--sans); color: var(--auj-doux); letter-spacing: 0; vertical-align: middle; }
+
+/* N-6 (itération 3) : la mention reste visible dans toutes les vues, dans la barre de commandes. */
+.commandes .mention-commandes { color: #fff; font-weight: 600; padding: 2px 8px; border: 1px solid #9ca3af; border-radius: 999px; }

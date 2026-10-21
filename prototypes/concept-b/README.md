@@ -104,3 +104,15 @@ Script : `capture.cjs`, avec le serveur lancé depuis `prototypes/` (`npx vite -
 | B-8 · souvenir libre et tiers | Aides : « Seulement ce que vous avez vécu. Ne nommez personne. » et « Une phrase, 120 caractères au plus. Ne nommez personne. » Au palier 2, un modérateur vérifie ce point. | Texte du formulaire lu à l'exécution ; l'ancienne formule a disparu. |
 | T-1 · information du consentement | Court avis avant les cases : qui recueille (« le Réseau ACTION TI (hypothèse, à confirmer) »), pourquoi, combien de temps, comment retirer (bouton ou code affiché après l'envoi), « Démo : cet avis et le code de retrait sont simulés ». Le nom du Réseau y paraît, donc « Proposition non officielle · prototype » est ajouté à l'en-tête du formulaire et à la légende du mur. | Les huit mentions sont lues à l'exécution ; code de la forme `B-XXXX` affiché après l'envoi. `concept-b-formulaire.png`, `concept-b-formulaire-envoye.png`. |
 
+## Corrections de l'itération 3
+
+*2026-10-21, d'après [equipe-rouge-2.md](/mnt/project-files/exp-002/etape-4/boucles/equipe-rouge-2.md). Preuves : sortie de `PORT=5195 node concept-b/capture.cjs` (serveur `npx vite --port 5195 --strictPort` ; sans `PORT`, le script garde le port 5192 documenté), 21 vérifications sur 21 réussies (17 de l’itération 2, 4 nouvelles), console sans erreur, aucune requête hors de localhost. `package.json` et les dépendances sont inchangés (N-7 laissé à la décision de Chams).*
+
+| Constat | Correctif | Preuve |
+| --- | --- | --- |
+| N-1 · canal actif invisible en recadré | Cartouche fixe en haut à gauche du cadre, hors de la scène transformée (donc immobile quand la caméra glisse), affiché seulement en mode recadré : « Canal 04 / 07 · Régions », puis « Scène 2 · canal entrant · Vous écrivez la suite ». | `mur.js`, `majCartouche()`. À 1366 × 768 : cartouche dans la fenêtre et égal au canal de l'en-tête ; masqué en mur entier. `concept-b-portable-cartouche.png` |
+| N-3 · portée du code (à l'écran) | « (démo : tant que le mur reste ouvert) » dans l'avis (« Comment retirer »), à côté de chaque code affiché après l'envoi et dans l'aide du formulaire « Retirer une phrase avec un code ». | Les trois textes lus à l'exécution. `concept-b-formulaire-envoye.png` |
+| N-5 · l'avis nomme le Réseau | « Qui recueillerait : l'organisateur (à confirmer, par exemple le Réseau ACTION TI). » | Avis lu à l'exécution. `concept-b-formulaire.png` |
+
+La limite « le nom du canal sort du cadre » (section Limites) est levée par N-1 pour le canal actif ; les noms des autres rangs restent hors cadre quand la caméra est à droite.
+

@@ -267,3 +267,11 @@ body.vue-formulaire .cat-internet { background: #6d28d9; }
 }
 .visually-hidden { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; }
 .erreurs ul { margin: 4px 0 0; padding-left: 20px; }
+
+/* N-6 (itération 3) : la mention reste visible dans tous les recadrages, dans la barre de commandes. */
+#commandes > .mention-commandes:not(#b-pause) { opacity: 1; color: var(--texte); font-weight: 600; padding: 2px 8px; border: 1px solid #56638f; border-radius: 999px; }
+/* N-4 (itération 3) : retrait avec un code. */
+.par-code { margin-top: 18px; font-size: 15px; }
+.par-code summary { cursor: pointer; font-weight: 700; min-height: 32px; }
+.par-code input { display: block; width: 100%; box-sizing: border-box; font: inherit; font-size: 18px; padding: 8px 10px; border: 2px solid var(--f-bord); border-radius: 8px; text-transform: uppercase; }
+.etat-code { font-weight: 600; }

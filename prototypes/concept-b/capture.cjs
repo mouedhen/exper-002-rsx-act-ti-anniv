@@ -1,11 +1,13 @@
 // Captures et vérifications du concept B : node capture.cjs
 // (serveur lancé depuis prototypes/ : npx vite --port 5192 --strictPort).
 // Itération 2 : cas de test des constats B-1 à B-8 et T-1 (equipe-rouge-1.md).
+// Itération 3 : cas N-1, N-3, N-5 (equipe-rouge-2.md) ; autre port possible : PORT=5195 node concept-b/capture.cjs.
 const { chromium } = require('/opt/node22/lib/node_modules/playwright')
 const fs = require('node:fs')
 const path = require('node:path')
 
-const BASE = 'http://localhost:5192/concept-b/'
+const ORIGINE = `http://localhost:${process.env.PORT || '5192'}`
+const BASE = ORIGINE + '/concept-b/'
 const SORTIE = '/mnt/project-files/exp-002/etape-4/captures'
 const attendre = (ms) => new Promise((r) => setTimeout(r, ms))
 
@@ -17,7 +19,7 @@ const attendre = (ms) => new Promise((r) => setTimeout(r, ms))
     page.on('console', (m) => { if (m.type() === 'error' || m.type() === 'warning') erreurs.push(`${nom} [${m.type()}] ${m.text()}`) })
     page.on('pageerror', (e) => erreurs.push(`${nom} [pageerror] ${e.message}`))
     page.on('requestfailed', (r) => { if (!/ERR_ABORTED/.test(r.failure()?.errorText || '')) erreurs.push(`${nom} [requête] ${r.url()} ${r.failure()?.errorText}`) })
-    page.on('request', (r) => { if (!r.url().startsWith('http://localhost:5192')) erreurs.push(`${nom} [hors ligne violé] ${r.url()}`) })
+    page.on('request', (r) => { if (!r.url().startsWith(ORIGINE)) erreurs.push(`${nom} [hors ligne violé] ${r.url()}`) })
   }
 
   const verifs = []
@@ -103,7 +105,8 @@ const attendre = (ms) => new Promise((r) => setTimeout(r, ms))
   await tel.check('#age')
   const texteTel = await tel.$eval('main', (n) => n.textContent)
   ok('B-8', texteTel.includes('Ne nommez personne') && !texteTel.includes('le moins de personnes'), 'aide : « Ne nommez personne »')
-  ok('T-1', ['Qui recueille', 'Réseau ACTION TI (hypothèse, à confirmer)', 'Pourquoi', 'Combien de temps', 'Comment retirer', 'code de retrait', 'simulés', 'Proposition non officielle · prototype'].every((m) => texteTel.includes(m)), 'avis : qui, pourquoi, combien de temps, comment retirer, simulé, mention non officielle')
+  ok('T-1', ['Qui recueille', 'Qui recueillerait', 'organisateur (à confirmer, par exemple le Réseau ACTION TI)', 'Pourquoi', 'Combien de temps', 'Comment retirer', 'code de retrait', 'simulés', 'Proposition non officielle · prototype'].every((m) => texteTel.includes(m)), 'avis : qui, pourquoi, combien de temps, comment retirer, simulé, mention non officielle')
+  ok('N-5', texteTel.includes("Qui recueillerait : l'organisateur (à confirmer, par exemple le Réseau ACTION TI).") && !texteTel.includes('Qui recueille :'), `avis : « ${texteTel.match(/Qui recueill[^.]*\./)?.[0]} »`)
   await tel.screenshot({ path: path.join(SORTIE, 'concept-b-formulaire.png'), fullPage: true })
   await tel.click('button[type="submit"]')
   await attendre(5500)
@@ -111,6 +114,10 @@ const attendre = (ms) => new Promise((r) => setTimeout(r, ms))
   await mur.bringToFront(); await attendre(4000)
   await mur.screenshot({ path: path.join(SORTIE, 'concept-b-mur-scene2.png') })
   const code1 = await tel.$eval('#liste-envois .code', (n) => n.textContent)
+  const ligneCode = await tel.$eval('#liste-envois .envoi-code', (n) => n.textContent)
+  const avisRetrait = await tel.$eval('#avis', (n) => n.textContent)
+  const aideCode = await tel.$eval('#aide-code', (n) => n.textContent)
+  ok('N-3', [ligneCode, avisRetrait, aideCode].every((t) => t.includes('(démo : tant que le mur reste ouvert)')), `à l'écran : « ${ligneCode.trim()} » ; avis et aide du code portent la même précision`)
   ok('T-1', /^B-[A-Z0-9]{4}$/.test(code1), `code de retrait affiché après l'envoi : ${code1}`)
   ok('T-1', await surMur(mur, 'Proposition non officielle · prototype'), 'mur : « Proposition non officielle · prototype » dans la légende')
 
@@ -161,6 +168,22 @@ const attendre = (ms) => new Promise((r) => setTimeout(r, ms))
   })
   ok('B-7', lis.recadre === 'true' && lis.texte >= 56, `énoncés à ${lis.texte} px au mur ; mode recadré actif à 1366 px (échelle ${lis.s.toFixed(3)} au lieu de 0,178)`)
   ok('B-7', lis.texte * lis.s >= 18, `rendu à 1366 px : énoncés ${(lis.texte * lis.s).toFixed(1)} px, dates ${(lis.date * lis.s).toFixed(1)} px ; ${lis.deborde} carte qui déborde`)
+  // N-1 (itération 3) : en recadré, un cartouche fixe nomme le canal actif, même quand la caméra a quitté la gauche.
+  await l.click('#btn-tel') // referme le téléphone
+  await attendre(2500)
+  const n1 = await l.evaluate(() => {
+    const c = document.getElementById('cartouche-canal'), r = c.getBoundingClientRect()
+    const nom = document.querySelector('#entete-canal .canal-nom')?.textContent || ''
+    const enTete = document.getElementById('entete-canal').getBoundingClientRect()
+    return { texte: c.textContent, visible: !c.hidden && r.width > 0 && r.left >= 0 && r.top >= 0 && r.right <= innerWidth && r.bottom <= innerHeight, nom, enteteHors: enTete.left < 0 || enTete.right > innerWidth }
+  })
+  await l.screenshot({ path: path.join(SORTIE, 'concept-b-portable-cartouche.png') })
+  ok('N-1', n1.visible && n1.nom && n1.texte.includes(n1.nom), `1366 × 768 recadré : cartouche « ${n1.texte} » dans la fenêtre ; en-tête du canal ${n1.enteteHors ? 'hors cadre (en partie au moins)' : 'dans le cadre'}`)
+  await l.click('#btn-s2'); await attendre(1500)
+  const n1s2 = await l.$eval('#cartouche-canal', (c) => (c.hidden ? '' : c.textContent))
+  await l.click('#btn-recadre'); await attendre(300)
+  const n1off = await l.$eval('#cartouche-canal', (c) => c.hidden)
+  ok('N-1', /Vous écrivez la suite/.test(n1s2) && n1off, `scène 2 : « ${n1s2} » ; mur entier (recadrage coupé) : cartouche ${n1off ? 'masqué' : 'VISIBLE'}`)
   await ctxL.close()
 
   // 5. Vidéo d'environ 15 s : un passage de canal, puis une transmission saisie qui arrive.

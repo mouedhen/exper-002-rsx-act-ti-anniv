@@ -89,6 +89,7 @@ export function monterMur(racine, params) {
     tel: racine.querySelector('#panneau-tel'),
     cloture: racine.querySelector('#cloture'),
     annonce: racine.querySelector('#annonce'),
+    cartouche: racine.querySelector('#cartouche-canal'),
   }
   if (params.get('kiosque') === '1') document.body.classList.add('kiosque')
 
@@ -234,6 +235,7 @@ function gabarit() {
       </footer>
       <p id="badge-pause" class="badge-pause" hidden>En pause</p>
     </div>
+    <p id="cartouche-canal" class="cartouche-canal" hidden></p>
   </div>
 
   <nav class="barre" aria-label="Commandes de la démo">
@@ -357,6 +359,14 @@ function basculerPause() {
   el.annonce.textContent = etat.pause ? 'Mouvement en pause.' : 'Mouvement repris.'
 }
 
+// N-1 (itération 3) : en mode recadré, l'en-tête et les noms de rangs sortent du cadre ;
+// un cartouche fixe, hors de la scène transformée, répète le canal actif.
+function majCartouche(texte) {
+  if (!el.cartouche) return
+  el.cartouche.textContent = texte
+  el.cartouche.hidden = !etat.recadre
+}
+
 function majBoutons() {
   el.btnPause.textContent = etat.pause ? 'Reprendre (espace)' : 'Pause (espace)'
   el.btnPause.setAttribute('aria-pressed', String(etat.pause))
@@ -365,6 +375,7 @@ function majBoutons() {
   el.badgePause.hidden = !etat.pause
   el.btnReduit.setAttribute('aria-pressed', String(etat.reduit))
   document.getElementById('btn-recadre')?.setAttribute('aria-pressed', String(etat.recadre))
+  if (el.cartouche) el.cartouche.hidden = !etat.recadre
   document.body.classList.toggle('reduit', etat.reduit)
 }
 
@@ -544,6 +555,7 @@ function passerCanal(i) {
     <p class="surtitre">Scène 1 · requête depuis aujourd'hui · canal ${String(i + 1).padStart(2, '0')} / ${String(CANAUX.length).padStart(2, '0')}</p>
     <p class="canal-nom">${c.nom}</p>
     <p class="canal-q">${c.question}</p>`
+  majCartouche(`Canal ${String(i + 1).padStart(2, '0')} / ${String(CANAUX.length).padStart(2, '0')} · ${c.nom}`)
 
   // Points du canal, du plus récent au plus ancien : la sonde part de 2026 et remonte.
   const xs = [...new Set(c.points.map((p) => xAn(p.an)))].filter((x) => x <= X_MAINTENANT).sort((a, b) => b - a)
@@ -641,6 +653,7 @@ function sceneEntrante() {
     <p class="surtitre">Scène 2 · canal entrant · 47e JIQ, aujourd'hui</p>
     <p class="canal-nom">Vous écrivez la suite</p>
     <p class="canal-q" data-fait="F-080">${FAITS['F-080'].enonce} <span class="fid">F-080 · 2025</span></p>`
+  majCartouche('Scène 2 · canal entrant · Vous écrivez la suite')
   if (!etat.reduit) animate([...el.entete.children], { opacity: [0, 1], translateY: [24, 0], duration: 600, delay: stagger(90) })
   majCartesPublic(false)
 
