@@ -1,4 +1,5 @@
 %% Event Storming Big Picture, section 5 : participation, capsule, microsite (Recycle J1, D-044)
+%% v0.3 : paliers (D-051). Palier 1 = démonstration sur portable, hors ligne, contributions simulées ; le serveur n'existe qu'au palier 2.
 %% Orange : événement ; bleu : commande ; jaune : acteur ; violet : système ; rose : point chaud
 flowchart LR
     classDef ev fill:#FFD3A8,stroke:#C98A4B,color:#000
@@ -8,12 +9,14 @@ flowchart LR
     classDef hot fill:#FFA8DB,stroke:#C94B8A,color:#000
 
     V([Visiteur de la JIQ]):::act --> C1[/Scanner le QR code du mur/]:::cmd
-    C1 --> E1[Le microsite s'est ouvert]:::ev
-    E1 --> C2[/Écrire un témoignage, un souhait ou une idée/]:::cmd
+    C1 --> E1[Le formulaire s'est ouvert, en français ou en anglais]:::ev
+    E1 --> C0[/Choisir sa satisfaction ou son attente/]:::cmd
+    C0 --> C2[/Option : écrire un témoignage, un souhait ou une idée/]:::cmd
     C2 --> E2[Le consentement a été donné, usage par usage]:::ev
     E2 --> E3[La contribution a été soumise]:::ev
-    E3 --> SRV[(Serveur et file de modération)]:::sys
-    M([Modérateur au stand, à confirmer]):::act --> C3[/Approuver ou refuser/]:::cmd
+    E3 --> E3b[Le visiteur voit « en attente de validation »]:::ev
+    E3 --> SRV[(File de modération : simulée sur le portable au palier 1, serveur au palier 2)]:::sys
+    M([Modérateur au stand : Chams en démo, bénévole du Réseau au palier 2]):::act --> C3[/Approuver ou refuser/]:::cmd
     SRV --> C3
     C3 --> E4[La contribution est apparue sur le mur]:::ev
 
@@ -23,9 +26,9 @@ flowchart LR
     C5 --> E6[Le message vocal a été enregistré]:::ev
     E6 --> E7[La capsule a été scellée : WAV, empreinte, 3 copies]:::ev
     G([Gardien des capsules, à confirmer]):::act --> E8[La capsule a été confiée au gardien]:::ev
-    E7 --> E8 --> E9[La capsule a été ouverte en 2046]:::ev
+    E7 --> E8 --> E9[La capsule a été ouverte en 2046, palier 3 seulement]:::ev
 
-    H1{{Wi-Fi externe interdit : mur hors ligne ou filaire}}:::hot -.- E4
+    H1{{Wi-Fi externe interdit : mur hors ligne, le formulaire passe par le forfait cellulaire du visiteur}}:::hot -.- E4
     H2{{Loi 25 : consentement jusqu'en 2046, retrait, moins de 14 ans}}:::hot -.- E5
     H3{{Bruit du salon : combiné plutôt que micro ouvert}}:::hot -.- C4
     H4{{Gardien inconnu : BAnQ, université, Action TI ?}}:::hot -.- G
