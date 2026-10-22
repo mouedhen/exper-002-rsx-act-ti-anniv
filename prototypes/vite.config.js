@@ -11,6 +11,7 @@ export default defineConfig({
         a: resolve(import.meta.dirname, 'concept-a/index.html'),
         b: resolve(import.meta.dirname, 'concept-b/index.html'),
         c: resolve(import.meta.dirname, 'concept-c/index.html'),
+        combi: resolve(import.meta.dirname, 'concept-combi/index.html'),
       },
     },
   },
