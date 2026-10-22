@@ -107,7 +107,7 @@ Exclus : **tout effectif** (membres, contacts, bénévoles ; D-055), dont F-005,
 - la vidéo du mur `concept-combi-mur.webm` ;
 - la vidéo `concept-combi-formulaire.webm`, où un cadre téléphone et le mur sont côte à côte : erreurs, saisie, approbation, arrivée sur l'horizon, retrait.
 
-Il sort en erreur si un cas échoue. Depuis l'itération 2, les faits sont lus dans le **texte visible** (`.saisie`, `.morph`, éléments opaques, opacité de chaque source), jamais dans le texte caché `.sr`. Résultat du 2026-10-22 (itération 2) : **42 cas sur 42 OK**.
+Il sort en erreur si un cas échoue. Depuis l'itération 2, les faits sont lus dans le **texte visible** (`.saisie`, `.morph`, éléments opaques, opacité de chaque source), jamais dans le texte caché `.sr`. Résultat du 2026-10-22 (itération 2) : **42 cas sur 42 OK** ; itération 3 : **45 cas sur 45 OK** (serveur sur le port 5201).
 
 | Règle | Cas de test |
 | --- | --- |
@@ -146,3 +146,15 @@ Constats de [equipe-rouge-combi-1.md](/mnt/project-files/exp-002/etape-4/boucles
 | **m-6** · les tests lisaient le texte caché et laissaient passer M-1 à M-3 | `capture.cjs` lit le texte **visible** (`.saisie`, `.morph`, éléments opaques, opacité de chaque `.src`). Il ajoute un cas par constat : rotation sur 80 s, fin de chaque introduction, mouvement réduit sans arrivée, et les cas m-1 à m-5. | 42 cas sur 42 OK. Une relecture par un agent séparé reste à faire. |
 
 Reste hors correctif : la vidéo et les captures sont faites dans Chromium seulement ; il n'y a pas d'analyse PEAT ; vite 8.3.2 n'a pas changé (N-7).
+
+## Corrections de l'itération 3
+
+Constats de [equipe-rouge-combi-2.md](/mnt/project-files/exp-002/etape-4/boucles/equipe-rouge-combi-2.md). Correction minimale, dans `mur.js` seulement ; les concepts A, B et C et `package.json` ne sont pas modifiés. Un cas par constat dans `capture.cjs` (étape 12), sur le texte **visible** et la **position à l'écran**. `capture.cjs` relancé le 2026-10-22 (`PORT=5201`, Chromium local) : **45 cas sur 45 OK**. Toutes les captures `concept-combi-*` sont refaites, dont deux nouvelles.
+
+| Constat | Correction | Preuve |
+| --- | --- | --- |
+| **N-1** (majeur) · à 1366 px, un souvenir de 2009-2025 n'apparaissait nulle part à l'écran | Dans `arriver`, cas sans décor (`k === 0`) : si la vue est recadrée sur les décors, le cadre passe à la vue « aujourd'hui » **avant** que la carte n'entre dans le fil. Il revient à la vue des décors 8 s après (`TENUE_FIL`, compté depuis le dernier souvenir de 2009-2025), ou tout de suite si une arrivée part vers un décor. Les deux coupes passent par la garde de luminance (`attendreFondu`, puis 1 s de stabilité) et la réarment. Si l'opérateur change de vue pendant ce temps, son choix prime : pas de retour automatique. La pause fige l'attente. | Cas « N-1 » : 1366 × 768, vue par défaut, souvenir de 2019 envoyé par le vrai formulaire, en mouvement normal et réduit. La vue passe de `epoques` à `aujourdhui`. Le texte visible de la carte, « 2019 Souvenir de 2019 → reste au fil… », est à x = 288-1081, y = 310-330 dans une fenêtre de 1366 × 768, et l'élément est au premier plan (`elementFromPoint`). Retour à `epoques` environ 7 s après la pose. Capture `1366-souvenir-2019-au-fil.png` (nouvelle) |
+| **N-2** · le titre du fil contredisait l'exception ; un souvenir de 2009-2025 sorti du fil était compté « au mur » | Titre : « Vos mots arrivent ici, puis partent vers leur année (2009-2025 : ils restent ici) ». Le compteur sépare les deux cas : « et 2 autres phrases au mur (exemples simulés) ; 2 souvenirs de 2009-2025 déjà passés au fil ». Sans souvenir de 2009-2025 hors du fil, le texte est inchangé. | Cas « N-2 » : 1920 px, 4 souvenirs de 2009-2025 à la suite. Le titre et le compteur sont visibles et dans la fenêtre. Le compteur est égal au texte attendu, recalculé depuis l'état du mur. Capture `mur-12-fil-titre-et-compteur.png` (nouvelle) |
+| **N-3** · les boutons de décor contournaient la garde du m-4 | Un clic attend `attendreFondu()` (fin du fondu, puis 1 s de décor stable). Les clics reçus pendant l'attente sont regroupés : seul le dernier décor demandé est affiché. | Cas « N-3 » : 12 clics en 3 s sur « 1991-2008 » et « 1976-1990 », en mouvement réduit. L'opacité du décor 2 passe 0,5 à 558 et 2 291 ms seulement, soit au plus 1 changement brusque par fenêtre de 1 s (6 passages en 1,6 s avant le correctif) |
+
+Reste hors correctif : Chromium seulement, pas d'analyse PEAT, vite 8.3.2 inchangé. La coupe de cadre de N-1 est franche, sans travelling. Elle compte comme un changement brusque dans la garde de luminance.

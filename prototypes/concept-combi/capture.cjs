@@ -2,6 +2,7 @@
 // Prérequis : `npx vite --port 5199 --strictPort` lancé depuis prototypes/ (autre port : PORT=5197 node concept-combi/capture.cjs).
 // Itération 2 : les faits sont vérifiés sur le texte VISIBLE (.saisie, .morph, opacité de chaque source), jamais
 // sur le texte caché (.sr) ; un cas par constat de l'équipe rouge combi 1 (M-1 à M-4, m-1 à m-5).
+// Itération 3 : un cas par constat de l'équipe rouge combi 2 (N-1, N-2, N-3), sur le texte visible et la position à l'écran.
 // Sorties dans /mnt/project-files/exp-002/etape-4/captures/ : concept-combi-*.png, concept-combi-mur.webm,
 // concept-combi-formulaire.webm (parcours téléphone → mur). Sort en erreur si un cas échoue.
 const { chromium } = require('/opt/node22/lib/node_modules/playwright')
@@ -707,6 +708,110 @@ const verifier = (regle, ok, detail) => { verifs.push({ regle, ok: !!ok, detail 
     ecartsDe(rotN).length ? ecartsDe(rotN).join(' ; ') : `texte visible relu à ${rotN.lectures.map((l) => `${l.t} s (décor ${l.scene})`).join(', ')} : 14 faits entiers (dont F-007 jusqu'au « Q » final), 14 sources visibles (dont « F-007 · S-004 »), nom F-016 « Réseau ACTION TI » entier`)
   verifier('M-3 · mouvement réduit sans arrivée : décors pleins, d\'un bloc', lus(rotR) && !ecartsDe(rotR).length,
     ecartsDe(rotR).length ? ecartsDe(rotR).join(' ; ') : `texte visible relu 2 s après chaque changement (${rotR.lectures.map((l) => `${l.t} s, décor ${l.scene}`).join(' ; ')}) : tous les faits, leurs sources et le nouveau nom sont affichés`)
+
+  // =====================================================================================
+  console.log('étape 12 · itération 3 : N-1 (souvenir 2009-2025 visible à 1366 px), N-2 (titre et compteur du fil), N-3 (boutons de décor gardés)')
+  // N-1 : à 1366 px, vue par défaut, souvenir de 2019 envoyé par le vrai formulaire ; on lit le texte VISIBLE de la carte
+  // et sa position dans la fenêtre (rectangle dans l'écran, élément au premier plan au centre), en mouvement normal et réduit.
+  const lireCarteEcran = (mur, id) => mur.evaluate((i) => {
+    const li = document.querySelector(`.carte-contrib[data-id="${i}"]`)
+    if (!li) return { existe: false, vue: document.body.dataset.vue }
+    const g = li.querySelector('.genre')
+    const r = g.getBoundingClientRect()
+    const cx = r.left + r.width / 2
+    const cy = r.top + r.height / 2
+    const dessus = cx >= 0 && cy >= 0 && cx < innerWidth && cy < innerHeight ? document.elementFromPoint(cx, cy) : null
+    return {
+      existe: true,
+      vue: document.body.dataset.vue,
+      texte: li.checkVisibility({ opacityProperty: true, visibilityProperty: true }) && Number(getComputedStyle(li).opacity) > 0.95 ? g.innerText : '',
+      x: Math.round(r.left), droite: Math.round(r.right), y: Math.round(r.top), bas: Math.round(r.bottom), largeur: innerWidth, hauteur: innerHeight,
+      dansFenetre: r.left >= 0 && r.top >= 0 && r.right <= innerWidth && r.bottom <= innerHeight,
+      auPremierPlan: !!dessus && li.contains(dessus),
+    }
+  }, id)
+  const n1 = {}
+  for (const mouvement of ['no-preference', 'reduce']) {
+    const c = await browser.newContext({ viewport: { width: 1366, height: 768 }, reducedMotion: mouvement })
+    const m = await ouvrir(c, `mur-1366-n1-${mouvement}`, URL)
+    const t = await ouvrir(c, `form-1366-n1-${mouvement}`, URL + '?vue=formulaire', TEL)
+    await attendre(1500)
+    await m.bringToFront()
+    const vueAvant = await m.evaluate(() => document.body.dataset.vue)
+    const id = await envoyer(t, { type: 'souvenir', cat: 'internet', an: 2019, texte: 'Phrase d’essai : un souvenir daté de 2019 (démo).' })
+    await m.bringToFront()
+    await posee(m, id)
+    await attendre(600)
+    const pendant = await lireCarteEcran(m, id)
+    if (mouvement === 'no-preference') await m.screenshot({ path: PNG('1366-souvenir-2019-au-fil') })
+    const t0 = Date.now()
+    await m.waitForFunction(() => document.body.dataset.vue === 'epoques', null, { timeout: 20000 }).catch(() => {})
+    const retour = { vue: await m.evaluate(() => document.body.dataset.vue), s: Math.round((Date.now() - t0) / 100) / 10 }
+    n1[mouvement] = { vueAvant, pendant, retour }
+    await c.close()
+  }
+  const okN1 = (r) => r.vueAvant === 'epoques' && r.pendant.vue === 'aujourdhui' && /^2019\s*Souvenir de 2019/.test(r.pendant.texte) && r.pendant.dansFenetre && r.pendant.auPremierPlan && r.retour.vue === 'epoques'
+  verifier('N-1 · à 1366 px (vue par défaut), un souvenir de 2019 est visible à l\'écran, puis le cadre revient', okN1(n1['no-preference']) && okN1(n1.reduce),
+    Object.entries(n1).map(([k, r]) => `${k === 'reduce' ? 'réduit' : 'normal'} : vue ${r.vueAvant} → ${r.pendant.vue} ; texte visible « ${(r.pendant.texte || '').replace(/\s+/g, ' ').slice(0, 40)}… » à x = ${r.pendant.x}-${r.pendant.droite}, y = ${r.pendant.y}-${r.pendant.bas} (fenêtre ${r.pendant.largeur} × ${r.pendant.hauteur}), au premier plan : ${r.pendant.auPremierPlan} ; retour à ${r.retour.vue} ${r.retour.s} s après`).join(' ; '))
+
+  // N-2 : titre du fil et compteur cohérents avec l'exception 2009-2025 (texte visible, dans la fenêtre, à 1920 px).
+  const c12 = await browser.newContext({ viewport: { width: 1920, height: 540 } })
+  const m12 = await ouvrir(c12, 'mur-n2', URL)
+  await attendre(800)
+  for (const [i, an] of [2019, 2010, 2012, 2015].entries()) {
+    const id = `R-N2-${i}`
+    await m12.evaluate(([idm, a]) => new BroadcastChannel('concept-combi-contributions').postMessage({ type: 'ajout', id: idm, typeContribution: 'souvenir', cat: 'internet', an: a, texte: `Phrase d’essai : souvenir de ${a}.` }), [id, an])
+    await posee(m12, id)
+  }
+  await attendre(800)
+  const n2 = await m12.evaluate(() => {
+    const vis = (el) => !!el && el.checkVisibility({ opacityProperty: true, visibilityProperty: true }) && Number(getComputedStyle(el).opacity) > 0.95
+    const dedans = (el) => { const r = el.getBoundingClientRect(); return r.width > 0 && r.left >= 0 && r.top >= 0 && r.right <= innerWidth && r.bottom <= innerHeight }
+    const h2 = document.querySelector('.colonne-auj h2, aside h2')
+    const plus = document.getElementById('plus')
+    return {
+      titre: vis(h2) && dedans(h2) ? h2.innerText : '',
+      plus: vis(plus) && dedans(plus) ? plus.innerText : '',
+      cartes: [...document.querySelectorAll('.carte-contrib')].map((li) => li.dataset.id),
+      contributions: window.__murCombi.contributions(),
+    }
+  })
+  await m12.screenshot({ path: PNG('mur-12-fil-titre-et-compteur') })
+  await c12.close()
+  // Attendu, recalculé depuis l'état du mur : les souvenirs de 2009-2025 hors du fil sont comptés « au fil », les autres « au mur ».
+  const horsFil = n2.contributions.filter((c) => !n2.cartes.includes(c.id))
+  const nFil = horsFil.filter((c) => c.an >= 2009 && c.an <= 2025).length
+  const nMur = horsFil.length - nFil
+  const attenduN2 = `et ${nMur} autre${nMur > 1 ? 's' : ''} phrase${nMur > 1 ? 's' : ''} au mur (exemple${nMur > 1 ? 's' : ''} simulé${nMur > 1 ? 's' : ''}) ; ${nFil} souvenir${nFil > 1 ? 's' : ''} de 2009-2025 déjà passé${nFil > 1 ? 's' : ''} au fil`
+  verifier('N-2 · le titre et le compteur du fil disent l\'exception 2009-2025', /partent vers leur année \(2009-2025 : ils restent ici\)/.test(n2.titre) && !n2.cartes.includes('R-N2-0') && nFil >= 1 && nMur >= 1 && n2.plus === attenduN2,
+    `titre visible : « ${n2.titre} » ; souvenir de 2019 sorti du fil : ${!n2.cartes.includes('R-N2-0')} ; compteur visible : « ${n2.plus} » (attendu : « ${attenduN2} »)`)
+
+  // N-3 : 4 clics par seconde sur « 1976-1990 » / « 1991-2008 » pendant 3 s, en mouvement réduit ; on relève l'opacité
+  // du décor 2 à chaque image et on compte ses passages au-delà de 0,5 (un changement brusque sombre ↔ clair).
+  const c13 = await browser.newContext({ viewport: { width: 1366, height: 768 }, reducedMotion: 'reduce' })
+  const m13 = await ouvrir(c13, 'mur-n3', URL)
+  await attendre(2500)
+  const n3 = await m13.evaluate(() => new Promise((fin) => {
+    const t0 = performance.now()
+    const passages = []
+    let haut = Number(getComputedStyle(document.getElementById('scene2')).opacity) > 0.5
+    const lire = () => {
+      const h = Number(getComputedStyle(document.getElementById('scene2')).opacity) > 0.5
+      if (h !== haut) { passages.push(Math.round(performance.now() - t0)); haut = h }
+      if (performance.now() - t0 < 7000) requestAnimationFrame(lire)
+      else fin({ passages, scene: window.__murCombi.sceneActive() })
+    }
+    requestAnimationFrame(lire)
+    let n = 0
+    const iv = setInterval(() => {
+      document.querySelector(`.btn-scene[data-aller="${n % 2 === 0 ? 2 : 1}"]`).click()
+      if (++n >= 12) clearInterval(iv)
+    }, 250)
+  }))
+  await c13.close()
+  const parSeconde = Math.max(0, ...n3.passages.map((t) => n3.passages.filter((u) => u >= t && u < t + 1000).length))
+  verifier('N-3 · boutons de décor : au plus 1 changement brusque par seconde', parSeconde <= 1 && n3.passages.length >= 1,
+    `12 clics en 3 s (mouvement réduit) : passages de l'opacité du décor 2 au-delà de 0,5 à ${n3.passages.join(', ')} ms ; au plus ${parSeconde} par fenêtre de 1 s (avant le correctif : 6 passages en 1,6 s) ; décor final ${n3.scene}`)
 
   // =====================================================================================
   await browser.close()

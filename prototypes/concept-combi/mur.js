@@ -17,6 +17,7 @@ const HAUTEUR = 2160
 const CPS = 0.04 // caractères par milliseconde (40 par seconde)
 const DUREE_SCENE = 24000
 const TENUE_ARRIVEE = 14000
+const TENUE_FIL = 8000 // N-1 (itération 3) : durée du passage au fil « Aujourd'hui » pour un souvenir de 2009-2025
 const ANCIEN_NOM = "Fédération de l'informatique du Québec"
 const NOUVEAU_NOM = 'Réseau ACTION TI'
 // Décor 3 : géométrie de l'horizon, dans le repère de la zone .futur (5120 × 1910).
@@ -137,7 +138,7 @@ function gabarit(contenu) {
       </div>
     </section>
     <aside class="aujourdhui">
-      <header><p class="surtitre">Aujourd'hui · 2026 <span class="non-officiel-mur">Proposition non officielle · prototype</span></p><h2>Vos mots arrivent ici, puis partent vers leur année</h2>${pastille}</header>
+      <header><p class="surtitre">Aujourd'hui · 2026 <span class="non-officiel-mur">Proposition non officielle · prototype</span></p><h2>Vos mots arrivent ici, puis partent vers leur année (2009-2025 : ils restent ici)</h2>${pastille}</header>
       <div class="cartes-faits">${cartes}</div>
       <div class="fil">
         <h3>Le fil du public <span class="mod">modéré avant affichage</span></h3>
@@ -243,7 +244,9 @@ export function monterMur(app) {
     document.body.dataset.vue = v.nom
   }
   addEventListener('resize', ajuster)
-  btnVue.addEventListener('click', () => { vue = (vue + 1) % VUES.length; ajuster() })
+  // N-1 (itération 3) : vue choisie avant un passage automatique au fil « Aujourd'hui » (null : aucun passage en cours).
+  let vueAvantFil = null
+  btnVue.addEventListener('click', () => { vueAvantFil = null; vue = (vue + 1) % VUES.length; ajuster() })
   ajuster()
 
   // ---------- Registre des animations : la pause arrête tout (WCAG 2.2.2) ----------
@@ -403,6 +406,25 @@ export function monterMur(app) {
     const reste = 1000 - (performance.now() - finFondu)
     if (reste > 0) await attendre(reste)
   }
+  // N-1 (itération 3) : une coupe de cadre est un changement brusque ; elle attend la garde et la réarme.
+  async function couperVue(n) {
+    await attendreFondu()
+    if (vueAvantFil === null) vueAvantFil = vue
+    vue = n
+    ajuster()
+    finFondu = performance.now()
+  }
+  let jetonFil = 0 // le dernier souvenir de 2009-2025 arrivé décide du retour
+  async function revenirVue() {
+    if (vueAvantFil === null) return
+    const retour = vueAvantFil
+    await attendreFondu()
+    if (vueAvantFil === null) return // l'opérateur a changé de vue entre-temps
+    vueAvantFil = null
+    vue = retour
+    ajuster()
+    finFondu = performance.now()
+  }
   // m-2 (itération 2) : quand une arrivée achève le décor 3 en plein balayage, le compteur de la tête s'efface,
   // l'année finale est posée pendant qu'il est invisible, puis il revient.
   function masquerTete() {
@@ -532,9 +554,16 @@ export function monterMur(app) {
     const restes = contributions.slice(affichees)
     const n = restes.length
     plus.hidden = n <= 0
-    const tous = restes.every((c) => c.simule === 'exemple')
-    const genre = tous ? (n > 1 ? 'exemples simulés' : 'exemple simulé') : 'dont des exemples simulés'
-    const txt = n > 0 ? `et ${n} autre${n > 1 ? 's' : ''} phrase${n > 1 ? 's' : ''} au mur (${restes.some((c) => c.simule === 'exemple') ? genre : 'contributions de démo, simulées'})` : ''
+    // N-2 (itération 3) : un souvenir de 2009-2025 sorti du fil n'est sur aucun décor ; il est compté à part, « au fil ».
+    const auMurL = restes.filter((c) => decorDe(c.an) !== 0)
+    const auMur = auMurL.length
+    const auFil = n - auMur
+    const tous = auMurL.every((c) => c.simule === 'exemple')
+    const genre = tous ? (auMur > 1 ? 'exemples simulés' : 'exemple simulé') : 'dont des exemples simulés'
+    const s = (k) => (k > 1 ? 's' : '')
+    const txtMur = auMur > 0 ? `et ${auMur} autre${s(auMur)} phrase${s(auMur)} au mur (${auMurL.some((c) => c.simule === 'exemple') ? genre : 'contributions de démo, simulées'})` : ''
+    const txtFil = auFil > 0 ? `${auMur > 0 ? ' ; ' : 'et '}${auFil} souvenir${s(auFil)} de 2009-2025 déjà passé${s(auFil)} au fil` : ''
+    const txt = txtMur + txtFil
     if (plus.textContent !== txt) plus.textContent = txt
   }
 
@@ -595,17 +624,26 @@ export function monterMur(app) {
   async function arriver(c) {
     const v = nouveauVoyage(c)
     const k = v.k
+    // N-1 (itération 3) : un souvenir de 2009 à 2025, en vue recadrée sur les décors (portable), fait passer le cadre
+    // au fil « Aujourd'hui » avant que sa carte n'y entre ; le cadre revient après TENUE_FIL. Chaque coupe passe
+    // par la garde de luminance (attendreFondu).
+    if (k === 0 && vue === 1) {
+      await couperVue(2)
+      if (v.annule) { voyages.delete(c.id); revenirVue(); return }
+    }
     contributions.unshift(c)
     const li = ajouterCarte(c)
     if (k === 0) {
       // M-4 (itération 2) : un souvenir de 2009 à 2025 n'a pas de décor ; il reste au fil, marqué de son année.
       await garde(v, attendre(reduit ? 600 : 1200))
-      if (v.annule) return
+      if (v.annule) { revenirVue(); return }
       c.posee = true
       voyages.delete(c.id)
       li.classList.add('recue')
+      if (vueAvantFil !== null) { const j = ++jetonFil; attendre(TENUE_FIL).then(() => { if (j === jetonFil) revenirVue() }) }
       return
     }
+    await revenirVue() // une arrivée vers un décor se voit dans la vue des décors
     arreter(minuteur) // le décor ne change plus pendant l'arrivée
     await garde(v, attendre(reduit ? 400 : 1000))
     if (v.annule) return
@@ -865,9 +903,19 @@ export function monterMur(app) {
     e.preventDefault()
     basculer()
   })
-  btnsScene.forEach((b) => b.addEventListener('click', () => {
+  // N-3 (itération 3) : les boutons de décor passent par la garde de luminance (fin du fondu, puis 1 s de décor
+  // stable) ; des clics rapides se regroupent en un seul changement, vers le dernier décor demandé.
+  let cibleBouton = null
+  btnsScene.forEach((b) => b.addEventListener('click', async () => {
     if (enCours) return // une arrivée choisit son décor
-    allerScene(Number(b.dataset.aller))
+    const attente = cibleBouton !== null
+    cibleBouton = Number(b.dataset.aller)
+    if (attente) return
+    await attendreFondu()
+    const n = cibleBouton
+    cibleBouton = null
+    if (enCours) return
+    allerScene(n)
     planifier(DUREE_SCENE)
   }))
   const cloture = document.getElementById('cloture')
