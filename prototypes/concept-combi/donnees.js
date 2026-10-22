@@ -6,12 +6,15 @@ import { REF } from './faits-ref.js'
 const fait = (id) => ({ id, ...REF[id] })
 
 // Trois décors au plus (recommandation de concepts.md). L'année choisie par le visiteur décide du décor.
+// M-4 (itération 2) : la page web s'arrête en 2008, comme ses faits. Un souvenir de 2009 à 2026 n'a pas de décor
+// dans le prototype : il reste dans le fil « Aujourd'hui », marqué de son année (« décor » 0).
 export const DECORS = {
+  0: { de: 2009, a: 2026, nom: "le fil « Aujourd'hui »", nomEn: 'the “Today” feed', sansDecor: true },
   1: { de: 1976, a: 1990, nom: "l'écran à caractères", nomEn: 'the character screen' },
-  2: { de: 1991, a: 2026, nom: 'la page web', nomEn: 'the web page' },
+  2: { de: 1991, a: 2008, nom: 'la page web', nomEn: 'the web page' },
   3: { de: 2027, a: 2046, nom: "l'interface du futur", nomEn: 'the interface of the future' },
 }
-export const decorDe = (an) => (an <= DECORS[1].a ? 1 : an <= DECORS[2].a ? 2 : 3)
+export const decorDe = (an) => (an <= DECORS[1].a ? 1 : an <= DECORS[2].a ? 2 : an <= DECORS[0].a ? 0 : 3)
 
 export const SCENE_1 = {
   titre: "1976-1990 · l'écran à caractères",
@@ -20,7 +23,7 @@ export const SCENE_1 = {
 }
 
 export const SCENE_2 = {
-  titre: '1991-2026 · la page web',
+  titre: '1991-2008 · la page web',
   faits: ['F-034', 'F-010', 'F-012', 'F-014', 'F-016'].map(fait),
 }
 

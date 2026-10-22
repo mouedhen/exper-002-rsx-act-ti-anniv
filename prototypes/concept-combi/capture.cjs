@@ -1,5 +1,7 @@
 // Captures et cas de test de la combinaison : un cas (au moins) par règle non négociable.
-// Prérequis : `npx vite --port 5197 --strictPort` lancé depuis prototypes/ (autre port : PORT=5198 node concept-combi/capture.cjs).
+// Prérequis : `npx vite --port 5199 --strictPort` lancé depuis prototypes/ (autre port : PORT=5197 node concept-combi/capture.cjs).
+// Itération 2 : les faits sont vérifiés sur le texte VISIBLE (.saisie, .morph, opacité de chaque source), jamais
+// sur le texte caché (.sr) ; un cas par constat de l'équipe rouge combi 1 (M-1 à M-4, m-1 à m-5).
 // Sorties dans /mnt/project-files/exp-002/etape-4/captures/ : concept-combi-*.png, concept-combi-mur.webm,
 // concept-combi-formulaire.webm (parcours téléphone → mur). Sort en erreur si un cas échoue.
 const { chromium } = require('/opt/node22/lib/node_modules/playwright')
@@ -7,13 +9,49 @@ const fs = require('fs')
 const path = require('path')
 const { lireReference, IDS } = require('./extraire-faits.cjs')
 
-const ORIGINE = `http://localhost:${process.env.PORT || '5197'}`
+const ORIGINE = `http://localhost:${process.env.PORT || '5199'}`
 const URL = ORIGINE + '/concept-combi/'
 const SORTIE = '/mnt/project-files/exp-002/etape-4/captures'
 const VIDEO_TMP = path.join(__dirname, '.video-tmp')
 const attendre = (ms) => new Promise((r) => setTimeout(r, ms))
 const PNG = (nom) => path.join(SORTIE, `concept-combi-${nom}.png`)
 const MENTIONS = ['Proposition non officielle · prototype', 'Unofficial proposal · prototype']
+
+// Faits tels qu'on les VOIT : texte tapé (.saisie), nom en cours (.morph), éléments visibles et opaques ;
+// le texte caché pour les lecteurs d'écran (.sr) n'est jamais lu. Une source n'est comptée que si elle est visible.
+const FAITS_VISIBLES = () => {
+  const vis = (el) => !!el && el.checkVisibility({ opacityProperty: true, visibilityProperty: true }) && Number(getComputedStyle(el).opacity) > 0.99
+  return [...document.querySelectorAll('[data-fait]')].map((el) => {
+    const scene = el.closest('[data-scene]')?.dataset.scene || 'auj'
+    if (el.matches('.ligne.fait')) {
+      const s = el.querySelector('.src')
+      return { id: el.dataset.fait, scene, genre: 'ligne', texte: vis(el) ? el.querySelector('.saisie').textContent : '', src: vis(s) ? s.textContent.trim() : '' }
+    }
+    if (el.matches('.nom')) return { id: el.dataset.fait, scene, genre: 'nom', texte: vis(el) ? el.querySelector('.morph').textContent : '', src: null }
+    const s = el.querySelector('.src, .lien')
+    return { id: el.dataset.fait, scene, genre: 'bloc', texte: vis(el) ? el.textContent : '', src: vis(el) && vis(s) ? s.textContent.replace(/[[\]]/g, '').trim() : '' }
+  })
+}
+const ATTENDUS = { 1: ['F-001', 'F-002', 'F-003', 'F-033', 'F-007'], 2: ['F-034', 'F-010', 'F-012', 'F-014', 'F-016'], 3: ['F-078', 'F-079', 'F-081', 'F-031'], auj: ['F-031', 'F-030'] }
+const norm = (t) => String(t).replace(/\s+/g, ' ').trim()
+// Compare les faits visibles d'une scène à la référence : énoncé et date entiers, source visible et identique.
+function ecartsVisibles(affiches, scene, ref) {
+  const ecarts = []
+  const ici = affiches.filter((f) => String(f.scene) === String(scene))
+  for (const id of ATTENDUS[scene]) {
+    const f = ici.find((x) => x.id === id && x.genre !== 'nom')
+    const r = ref[id]
+    if (!f) { ecarts.push(`${id} absent`); continue }
+    if (!norm(f.texte).includes(norm(r.enonce))) ecarts.push(`${id} énoncé tronqué ou absent : « …${norm(f.texte).slice(-30)} »`)
+    if (!norm(f.texte).includes(norm(r.date))) ecarts.push(`${id} date absente`)
+    if (f.src !== `${id} · ${r.sources}`) ecarts.push(`${id} source visible « ${f.src} »`)
+  }
+  if (String(scene) === '2') {
+    const nom = ici.find((x) => x.genre === 'nom')
+    if (!nom || nom.texte !== 'Réseau ACTION TI') ecarts.push(`nom F-016 visible « ${nom?.texte} »`)
+  }
+  return ecarts
+}
 
 const verifs = []
 const verifier = (regle, ok, detail) => { verifs.push({ regle, ok: !!ok, detail }); console.log(`${ok ? 'OK   ' : 'ÉCHEC'} ${regle} : ${detail}`) }
@@ -154,27 +192,29 @@ const verifier = (regle, ok, detail) => { verifs.push({ regle, ok: !!ok, detail 
 
   // =====================================================================================
   console.log('étape 3 · faits, D-055, son, hors ligne (sources)')
+  // Texte visible, scène par scène (en mouvement réduit, chaque décor s'affiche d'un bloc ; le mouvement normal
+  // est vérifié à la fin de chaque introduction par l'étape 11).
+  const ctx3r = await browser.newContext({ viewport: { width: 1920, height: 540 }, reducedMotion: 'reduce' })
+  const p3r = await ouvrir(ctx3r, 'mur-faits-visibles', URL)
+  await attendre(800)
+  const ref = lireReference()
+  const ecarts = []
+  const vus = new Set()
+  for (const k of [1, 2, 3]) {
+    await p3r.evaluate((n) => window.__murCombi.allerScene(n), k)
+    await attendre(1500)
+    const aff = await p3r.evaluate(FAITS_VISIBLES)
+    ecarts.push(...ecartsVisibles(aff, k, ref).map((e) => `décor ${k} : ${e}`))
+    if (k === 1) ecarts.push(...ecartsVisibles(aff, 'auj', ref).map((e) => `aujourd'hui : ${e}`))
+    aff.filter((f) => f.texte && (f.src || f.genre === 'nom') && (String(f.scene) === String(k) || f.scene === 'auj')).forEach((f) => vus.add(f.id))
+  }
+  await ctx3r.close()
+  const horsListe = [...vus].filter((i) => !IDS.includes(i))
+  verifier('Faits recopiés par script, avec source (texte VISIBLE)', !ecarts.length && IDS.every((i) => vus.has(i)) && !horsListe.length,
+    ecarts.length ? ecarts.join(' ; ') : `${vus.size} faits distincts lus dans le texte visible (.saisie, .morph, éléments opaques), sources visibles : date, énoncé et sources identiques à faits-par-epoque.md (${IDS.join(', ')})`)
   const ctx3 = await browser.newContext({ viewport: { width: 1920, height: 540 } })
   const p3 = await ouvrir(ctx3, 'mur-faits', URL)
   await attendre(800)
-  const ref = lireReference()
-  const affiches = await p3.evaluate(() => [...document.querySelectorAll('[data-fait]')].map((el) => ({
-    id: el.dataset.fait,
-    texte: el.textContent.replace(/\s+/g, ' '),
-    src: (el.querySelector('.src, .lien')?.textContent || '').replace(/[[\]]/g, '').trim(),
-  })).filter((f) => f.src))
-  const ecarts = []
-  for (const f of affiches) {
-    const r = ref[f.id]
-    if (!r) { ecarts.push(`${f.id} absent de la référence`); continue }
-    if (f.src !== `${f.id} · ${r.sources}`) ecarts.push(`${f.id} sources « ${f.src} » ≠ « ${r.sources} »`)
-    if (!f.texte.includes(r.enonce)) ecarts.push(`${f.id} énoncé différent`)
-    if (!f.texte.includes(r.date)) ecarts.push(`${f.id} date différente`)
-  }
-  const vus = new Set(affiches.map((f) => f.id))
-  const horsListe = [...vus].filter((i) => !IDS.includes(i))
-  verifier('Faits recopiés par script, avec source', !ecarts.length && IDS.every((i) => vus.has(i)) && !horsListe.length,
-    ecarts.length ? ecarts.join(' ; ') : `${vus.size} faits distincts, ${affiches.length} affichages : date, énoncé et sources identiques à faits-par-epoque.md (${IDS.join(', ')})`)
   // D-055 : aucun effectif, ni à l'écran (trois contenus, formulaire FR/EN, clôture) ni dans les sources hors commentaires.
   const EFFECTIF = /membre|contact|bénévol|adhérent|member|volunteer|\b1[46] ?000\b|\b2 ?[25]00\b|\b8 ?000\b/i
   const textes = []
@@ -307,6 +347,24 @@ const verifier = (regle, ok, detail) => { verifs.push({ regle, ok: !!ok, detail 
   const tD = await texteMur(mur5)
   verifier('Retrait par code, réponse du mur', /Aucune phrase ne porte le code R-ZZZZ/.test(inconnu) && /Retrait confirmé par le mur/.test(confirme) && !tD.includes('PHRASE-RETIREE-PAR-CODE'),
     `code inconnu : « ${inconnu} » ; code réel sur une page neuve : « ${confirme} » ; phrase visible ensuite ${tD.includes('PHRASE-RETIREE-PAR-CODE') ? 'OUI' : 'non'}`)
+  // e) m-1 : retrait 0,7 s après la naissance du point ; le trait jaune disparaît avec la phrase
+  await mur5.bringToFront()
+  await mur5.evaluate(() => window.__murCombi.allerScene(3))
+  await attendre(2500)
+  const idE = await envoyer(tel5, { type: 'souhait', cat: 'regions', an: 2043, texte: 'PHRASE-RETIREE-APRES-POSE' })
+  await posee(mur5, idE)
+  await attendre(700)
+  const lienOpac = () => mur5.evaluate(() => Number(getComputedStyle(document.getElementById('lien-point')).opacity))
+  const traitAvant = await lienOpac()
+  await tel5.click(`.retirer-phrase[data-id="${idE}"]`)
+  await attendre(400)
+  const traitApres = await lienOpac()
+  const tE = await texteMur(mur5)
+  await mur5.screenshot({ path: PNG('retrait-trait-efface') })
+  await attendre(1500)
+  const traitPlusTard = await lienOpac()
+  verifier('m-1 · le trait du point disparaît avec la phrase retirée', traitAvant > 0.9 && traitApres === 0 && traitPlusTard === 0 && !tE.includes('PHRASE-RETIREE-APRES-POSE'),
+    `opacité du trait 0,7 s après la naissance du point : ${traitAvant} ; 0,4 s après le retrait : ${traitApres} ; 1,9 s après : ${traitPlusTard} ; phrase visible ${tE.includes('PHRASE-RETIREE-APRES-POSE') ? 'OUI' : 'non'}`)
   await ctx5.close()
 
   // =====================================================================================
@@ -342,6 +400,23 @@ const verifier = (regle, ok, detail) => { verifs.push({ regle, ok: !!ok, detail 
   const tetes = await mur6.evaluate(() => document.getElementById('tete-annee').textContent)
   verifier('Mouvement réduit · arrivée sans déplacement', lettresVues === 0 && opac.some((o) => o > 0.05 && o < 0.95), `lettres, voyageurs créés : ${lettresVues} ; la phrase apparaît par un fondu (${opac.filter((o) => o > 0.05 && o < 0.95).length} valeurs intermédiaires) ; tête de lecture d'emblée à ${tetes}`)
   await mur6.screenshot({ path: PNG('mouvement-reduit') })
+  // m-4 : pire cas de luminance (rotation vers la page claire, puis arrivée vers le terminal sombre) ;
+  // le second changement attend la fin du fondu, puis 1 s de décor stable.
+  await attendre(1500)
+  // L'arrivée est postée sur le canal local dans la même milliseconde que la rotation (pire cas exact).
+  const idL = 'R-LUMI'
+  await mur6.evaluate((id) => {
+    window.__sc = []
+    new MutationObserver(() => window.__sc.push([performance.now(), document.body.dataset.scene])).observe(document.body, { attributes: true, attributeFilter: ['data-scene'] })
+    window.__murCombi.allerScene(2)
+    new BroadcastChannel('concept-combi-contributions').postMessage({ type: 'ajout', id, typeContribution: 'souvenir', cat: 'regions', an: 1980, texte: 'Phrase d’essai : retour au terminal.' })
+  }, idL)
+  await posee(mur6, idL)
+  const sc6 = await mur6.evaluate(() => window.__sc)
+  const tP = sc6.find(([, n]) => n === '2')?.[0]
+  const tT = sc6.find(([t, n]) => n === '1' && t > tP)?.[0]
+  verifier('m-4 · aucun changement de décor pendant un fondu (mouvement réduit)', tP != null && tT != null && tT - tP >= 1550,
+    `rotation vers la page claire et arrivée d'un souvenir de 1980 dans la même milliseconde : page claire à 0 ms, retour au terminal sombre à ${Math.round(tT - tP)} ms (fondu de 600 ms, puis au moins 1 s de décor stable ; avant le correctif : environ 400 ms)`)
   await ctx6.close()
 
   // =====================================================================================
@@ -389,6 +464,33 @@ const verifier = (regle, ok, detail) => { verifs.push({ regle, ok: !!ok, detail 
   verifier('Mur chargé · rotation lisible', v1 !== v2, `la phrase en vedette change toutes les 6 s (« ${v1.slice(0, 30)} » → « ${v2.slice(0, 30)} »)`)
   await ctx7.close()
 
+  // m-2 : une arrivée en plein balayage ; on compte les changements VISIBLES du compteur de la tête.
+  const ctx7b = await browser.newContext({ viewport: { width: 1920, height: 540 } })
+  const tel7 = await ouvrir(ctx7b, 'form-compteur', URL + '?vue=formulaire', TEL)
+  const mur7b = await ouvrir(ctx7b, 'mur-compteur-arrivee', URL)
+  await mur7b.bringToFront()
+  await attendre(500)
+  await mur7b.evaluate(() => {
+    window.__vis = []; window.__tous = 0
+    const el = document.getElementById('tete-annee')
+    new MutationObserver(() => { window.__tous++; if (Number(getComputedStyle(el).opacity) > 0.05) window.__vis.push([performance.now(), el.textContent]) })
+      .observe(el, { childList: true, characterData: true, subtree: true })
+    window.__murCombi.allerScene(3)
+  })
+  await attendre(5000)
+  const avantArrivee = await mur7b.evaluate(() => document.getElementById('tete-annee').textContent)
+  const idT = await envoyer(tel7, { type: 'souhait', cat: 'releve', an: 2041, texte: 'Arrivée en plein balayage.' })
+  await posee(mur7b, idT)
+  await attendre(1500)
+  const rt = await mur7b.evaluate(() => {
+    const v = window.__vis.map(([t]) => t)
+    const el = document.getElementById('tete-annee')
+    return { tous: window.__tous, visibles: v.length, max: Math.max(0, ...v.map((a) => v.filter((b) => b >= a && b < a + 1000).length)), fin: el.textContent, opac: Number(getComputedStyle(el).opacity) }
+  })
+  verifier('m-2 · compteur ≤ 2 changements visibles par seconde, arrivée en plein balayage', rt.max <= 2 && rt.fin === '2046' && rt.opac > 0.99 && avantArrivee !== '2046',
+    `arrivée quand la tête était à ${avantArrivee} ; ${rt.tous} changements, dont ${rt.visibles} visibles ; au plus ${rt.max} visibles dans une fenêtre de 1 s ; compteur final ${rt.fin}, opacité ${rt.opac}`)
+  await ctx7b.close()
+
   // =====================================================================================
   console.log('étape 8 · état vide du matin, contributions marquées')
   const ctx8 = await browser.newContext({ viewport: { width: 1920, height: 540 } })
@@ -408,6 +510,46 @@ const verifier = (regle, ok, detail) => { verifs.push({ regle, ok: !!ok, detail 
   }))
   verifier('État vide du matin', vide.n === 0 && !vide.cartes && !vide.points && /Personne n’a encore écrit/.test(vide.invitation) && vide.zones.every(Boolean) && !vide.exemple,
     `${vide.n} contribution, ${vide.points} point ; fil : « ${vide.invitation.slice(0, 40)}… » ; 3 décors en attente : ${vide.zones.every(Boolean)} ; aucun exemple simulé affiché : ${!vide.exemple}`)
+  // M-4 : un souvenir de 2009 à 2025 reste au fil « Aujourd'hui », marqué de son année ; m-3 : la pastille du matin vide disparaît.
+  const tel8 = await ouvrir(ctx8, 'form-2019', URL + '?vue=formulaire', TEL)
+  await tel8.check('input[name="type"][value="souvenir"]')
+  await tel8.selectOption('#an', '2009')
+  const aide2009 = await tel8.textContent('#aide-an')
+  await tel8.selectOption('#an', '2008')
+  const aide2008 = await tel8.textContent('#aide-an')
+  await mur8.bringToFront()
+  await mur8.evaluate(() => window.__murCombi.allerScene(3))
+  await attendre(2000)
+  const pastilleAvant = await mur8.evaluate(() => !!document.querySelector('.pastille-contenu'))
+  const id2019 = await envoyer(tel8, { type: 'souvenir', cat: 'internet', an: 2019, texte: 'Phrase d’essai : un souvenir daté de 2019 (démo).' })
+  await attendre(400)
+  const statut2019 = await tel8.textContent('#statut-texte')
+  await posee(mur8, id2019)
+  await attendre(600)
+  const r2019 = await mur8.evaluate((i) => {
+    const li = document.querySelector(`.carte-contrib[data-id="${i}"]`)
+    return {
+      scene: window.__murCombi.sceneActive(),
+      genre: li?.querySelector('.genre').textContent || '',
+      visible: !!li && li.checkVisibility({ opacityProperty: true, visibilityProperty: true }),
+      zones: [1, 2, 3].map((k) => document.querySelector(`#public-${k} .public-texte`).textContent).join(' | '),
+      pastille: !!document.querySelector('.pastille-contenu'),
+      titre2: document.querySelector('#scene2 .bandeau h2').textContent,
+      bouton2: document.querySelector('.btn-scene[data-aller="2"]').textContent,
+    }
+  }, id2019)
+  await mur8.screenshot({ path: PNG('mur-11-souvenir-2019-fil-aujourdhui') })
+  await tel8.screenshot({ path: PNG('formulaire-5-souvenir-2019'), fullPage: true })
+  verifier('M-4 · souvenir 2009-2025 → fil « Aujourd’hui », marqué de son année', r2019.scene === 3 && r2019.visible && /^2019Souvenir de 2019 → reste au fil : pas de décor/.test(r2019.genre) && !r2019.zones.includes('2019') && /1991-2008/.test(r2019.titre2) && r2019.bouton2 === '1991-2008' && /Pas de décor pour 2009-2025/.test(aide2009) && /la page web \(1991-2008\)/.test(aide2008) && /fil « Aujourd’hui », marquée 2019/.test(statut2019),
+    `décor inchangé (${r2019.scene}) ; carte du fil : « ${r2019.genre} » ; aucun décor ne la montre : ${!r2019.zones.includes('2019')} ; décor 2 titré « ${r2019.titre2} » ; formulaire, 2009 : « ${aide2009.slice(0, 60)}… », 2008 : « ${aide2008} » ; après l'envoi : « ${statut2019.slice(0, 75)}… »`)
+  verifier('m-3 · la pastille « matin vide » disparaît à la première arrivée', pastilleAvant && !r2019.pastille, `pastille avant : ${pastilleAvant} ; après la première arrivée : ${r2019.pastille}`)
+  const id2008 = await envoyer(tel8, { type: 'souvenir', cat: 'releve', an: 2008, texte: 'Phrase d’essai : un souvenir daté de 2008 (démo).' })
+  await mur8.bringToFront()
+  await posee(mur8, id2008)
+  await attendre(800)
+  const e2008 = await etat(mur8)
+  const z2008 = await texteZone(mur8, 2)
+  verifier('M-4 · borne 2008 → page web', e2008.scene === 2 && z2008.includes('2008'), `décor à l'atterrissage : ${e2008.scene} ; livre d'or : « ${z2008.slice(0, 50)} »`)
   await ctx8.close()
   const ctx8b = await browser.newContext({ viewport: { width: 1920, height: 540 } })
   const mur8b = await ouvrir(ctx8b, 'mur-exemples', URL)
@@ -434,6 +576,23 @@ const verifier = (regle, ok, detail) => { verifs.push({ regle, ok: !!ok, detail 
       return Object.fromEntries(sels.map((q) => [q, Math.round(px(q) * 10) / 10]))
     }, n))
   }
+  // m-5 : dans la vue recadrée par défaut, les lettres partent du cadre visible, pas de hors champ.
+  const tel9 = await ouvrir(ctx9, 'form-1366', URL + '?vue=formulaire', TEL)
+  await mur9.bringToFront()
+  const id1366 = await envoyer(tel9, { type: 'souhait', cat: 'regions', an: 2039, texte: 'Une JIQ itinérante, une région par année.' })
+  await mur9.waitForSelector('.vol .lettre', { timeout: 10000 })
+  const bord = await mur9.evaluate(() => {
+    const m = document.getElementById('scene-mur').getBoundingClientRect()
+    const s = m.width / 7680
+    const lefts = [...document.querySelectorAll('.vol .lettre')].map((l) => parseFloat(l.style.left))
+    return { max: Math.round(Math.max(...lefts)), bord: Math.round((innerWidth - m.left) / s), vue: document.body.dataset.vue, n: lefts.length }
+  })
+  await attendre(400)
+  await mur9.screenshot({ path: PNG('1366-vol-depuis-le-bord') })
+  await posee(mur9, id1366)
+  verifier('m-5 · à 1366 px, les lettres partent du cadre visible', bord.vue === 'epoques' && bord.n > 0 && bord.max < bord.bord,
+    `vue ${bord.vue} ; ${bord.n} lettres ; départ le plus à droite x = ${bord.max} (repère du mur) pour un bord visible à ${bord.bord}`)
+  await tel9.close()
   const mentions = { [vueDefaut]: await mentionVisible(mur9) }
   for (let i = 0; i < 2; i++) {
     await mur9.click('#btn-vue')
@@ -505,6 +664,49 @@ const verifier = (regle, ok, detail) => { verifs.push({ regle, ok: !!ok, detail 
   verifier('Formulaire · anglais', en.lang === 'en' && /Your sentence/.test(en.h1) && /Who would collect it: the organizer/.test(en.avis) && en.bouton === 'Send to the wall', `lang=${en.lang} ; « ${en.h1} » ; « ${en.bouton} »`)
   await f.click('#b-langue')
   await ctx10.close()
+
+  // =====================================================================================
+  console.log('étape 11 · rotation en boucle (M-1), faits entiers à l\'écran (M-2), mouvement réduit sans arrivée (M-3)')
+  // Deux murs côte à côte pendant 80 s, sans aucune arrivée : mouvement normal et mouvement réduit.
+  const tournerEtLire = async (mouvement) => {
+    const c = await browser.newContext({ viewport: { width: 1920, height: 540 }, reducedMotion: mouvement })
+    const p = await ouvrir(c, `mur-rotation-${mouvement}`, URL)
+    await p.evaluate(() => {
+      window.__changements = []
+      const t0 = performance.now()
+      new MutationObserver(() => window.__changements.push([Math.round((performance.now() - t0) / 100) / 10, document.body.dataset.scene])).observe(document.body, { attributes: true, attributeFilter: ['data-scene'] })
+    })
+    const t0 = Date.now()
+    const lectures = []
+    let visite = { scene: 1, debut: 0, lu: false }
+    const delai = mouvement === 'reduce' ? 2000 : 20000 // en mouvement normal, juste avant la fin de la visite (24 s)
+    while (Date.now() - t0 < 80000) {
+      await attendre(500)
+      const sc = await p.evaluate(() => window.__murCombi.sceneActive())
+      const t = Date.now() - t0
+      if (sc !== visite.scene) visite = { scene: sc, debut: t, lu: false }
+      if (!visite.lu && t - visite.debut >= delai) {
+        visite.lu = true
+        const aff = await p.evaluate(FAITS_VISIBLES)
+        lectures.push({ scene: sc, t: Math.round(t / 100) / 10, ecarts: ecartsVisibles(aff, sc, ref) })
+        if (lectures.filter((l) => l.scene === sc).length === 1) await p.screenshot({ path: PNG(mouvement === 'reduce' ? `mouvement-reduit-decor-${sc}-sans-arrivee` : `rotation-decor-${sc}-faits-complets`) })
+      }
+    }
+    const changements = await p.evaluate(() => window.__changements)
+    await c.close()
+    return { changements, lectures }
+  }
+  const [rotN, rotR] = await Promise.all([tournerEtLire('no-preference'), tournerEtLire('reduce')])
+  const sequence = (r) => r.changements.map(([t, n]) => `${t} s → ${n}`).join(' ; ')
+  const tourne = (r) => r.changements.length >= 3 && r.changements.some(([, n]) => n === '3') && r.changements.some(([, n]) => n === '1')
+  verifier('M-1 · les décors tournent en boucle, futur compris (sans arrivée)', tourne(rotN) && tourne(rotR),
+    `80 s sans contribution · mouvement normal : 0 s → 1 ; ${sequence(rotN)} · mouvement réduit : 0 s → 1 ; ${sequence(rotR)}`)
+  const lus = (r) => [1, 2, 3].every((k) => r.lectures.some((l) => l.scene === k))
+  const ecartsDe = (r) => r.lectures.flatMap((l) => l.ecarts.map((e) => `décor ${l.scene} à ${l.t} s : ${e}`))
+  verifier('M-2 · aucun fait tronqué à l\'écran, sources visibles (fin de chaque introduction)', lus(rotN) && !ecartsDe(rotN).length,
+    ecartsDe(rotN).length ? ecartsDe(rotN).join(' ; ') : `texte visible relu à ${rotN.lectures.map((l) => `${l.t} s (décor ${l.scene})`).join(', ')} : 14 faits entiers (dont F-007 jusqu'au « Q » final), 14 sources visibles (dont « F-007 · S-004 »), nom F-016 « Réseau ACTION TI » entier`)
+  verifier('M-3 · mouvement réduit sans arrivée : décors pleins, d\'un bloc', lus(rotR) && !ecartsDe(rotR).length,
+    ecartsDe(rotR).length ? ecartsDe(rotR).join(' ; ') : `texte visible relu 2 s après chaque changement (${rotR.lectures.map((l) => `${l.t} s, décor ${l.scene}`).join(' ; ')}) : tous les faits, leurs sources et le nouveau nom sont affichés`)
 
   // =====================================================================================
   await browser.close()

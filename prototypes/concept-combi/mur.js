@@ -94,7 +94,7 @@ function gabarit(contenu) {
       <div class="epoque epoque-web" id="scene2" data-scene="2">
         <header class="bandeau"><h2>${esc(SCENE_2.titre)}</h2><p>Décor stylisé : aucune page d'époque reproduite. Les faits, eux, sont sourcés.</p></header>
         <div class="fenetre">
-          <div class="barre-titre"><span>Chronologie 1991-2026 · navigateur</span></div>
+          <div class="barre-titre"><span>Chronologie 1991-2008 · navigateur</span></div>
           <div class="barre-outils" aria-hidden="true"><span class="relief">Précédent</span><span class="relief">Suivant</span><span class="relief">Recharger</span><span class="adresse">Adresse : décor stylisé</span></div>
           <div class="page">
             <h3 class="nom" data-fait="F-016">Le nom, en 2008 : <span class="morph"></span><span class="curseur-web" aria-hidden="true"></span></h3>
@@ -154,7 +154,7 @@ function gabarit(contenu) {
 <div class="commandes" role="toolbar" aria-label="Commandes de la démo">
   <button type="button" id="btn-pause" aria-pressed="false">Pause <kbd>espace</kbd></button>
   <button type="button" class="btn-scene" data-aller="1" aria-pressed="true">1976-1990</button>
-  <button type="button" class="btn-scene" data-aller="2" aria-pressed="false">1991-2026</button>
+  <button type="button" class="btn-scene" data-aller="2" aria-pressed="false">1991-2008</button>
   <button type="button" class="btn-scene" data-aller="3" aria-pressed="false">2027-2046</button>
   <button type="button" id="btn-vue">Vue : mur entier</button>
   <span class="groupe-contenu">Contenu :
@@ -316,6 +316,7 @@ export function monterMur(app) {
   const teteAnnee = document.getElementById('tete-annee')
   const e3 = { trace: 0, cartes: 0, p: 0 }
   let anTete = -1
+  let teteGelee = false // m-2 : pendant un achèvement forcé, le compteur est masqué puis posé une seule fois
   function rendu3() {
     ligneHorizon.style.strokeDashoffset = `${longueurHorizon * (1 - e3.trace)}`
     cartesFutur.forEach((c, k) => {
@@ -328,7 +329,7 @@ export function monterMur(app) {
     teteAnnee.style.left = `${x - 150}px`
     // Compteur de la tête de lecture : un pas toutes les 600 ms au plus (WCAG 2.3.1 : 2 changements par seconde au plus).
     const an = 2027 + Math.round(e3.p)
-    if (an !== anTete) {
+    if (an !== anTete && !teteGelee) {
       anTete = an
       teteAnnee.textContent = String(an)
       grads.forEach((g) => g.classList.toggle('passe', Number(g.dataset.an) <= an))
@@ -337,34 +338,43 @@ export function monterMur(app) {
   }
 
   // ---------- Fils de temps des décors (anime.js) ----------
-  const d = (ms) => (reduit ? 1 : ms)
+  // M-2 et M-3 (itération 2) : onUpdate ne voit pas la dernière image d'un fil de temps. L'état final de chaque
+  // décor est donc posé explicitement (achever), à la fin du fil (onComplete), lors d'un achèvement forcé par une
+  // arrivée, et d'emblée en mouvement réduit, sans fil de temps.
+  const RENDUS = { 1: rendu1, 2: rendu2, 3: rendu3 }
+  const FINAUX = {
+    1: () => { e1.s1 = total1 },
+    2: () => { e2.s2 = lis.length; e2.charge = 1; e2.morph = totalMorph },
+    3: () => { e3.trace = 1; e3.cartes = cartesFutur.length; e3.p = 19 },
+  }
+  function achever(n) { FINAUX[n](); RENDUS[n]() }
   const FONDU = reduit ? 600 : 1600 // en mouvement réduit, un fondu court plutôt qu'une coupe franche
   function intro(n) {
     if (n === 1) {
-      const tl = createTimeline({ autoplay: false, onUpdate: rendu1 })
+      const tl = createTimeline({ autoplay: false, onUpdate: rendu1, onComplete: () => achever(1) })
       tl.add(e1, { s1: [0, 0], duration: 1 }, 0)
-      let t = reduit ? 2 : 600
+      let t = 600
       lignes1.forEach((l, i) => {
-        const dur = d(Math.round(longueurs[i] / CPS))
+        const dur = Math.round(longueurs[i] / CPS)
         tl.add(e1, { s1: [decalages[i], decalages[i] + longueurs[i]], duration: dur, ease: 'linear' }, t)
-        t += dur + (reduit ? 1 : 700)
+        t += dur + 700
       })
       return tl
     }
     if (n === 2) {
-      const tl = createTimeline({ autoplay: false, onUpdate: rendu2 })
+      const tl = createTimeline({ autoplay: false, onUpdate: rendu2, onComplete: () => achever(2) })
       tl.add(e2, { s2: [0, 0], charge: [0, 0], morph: [0, 0], duration: 1 }, 0)
-      tl.add(e2, { charge: [0, 1], duration: d(2800), ease: 'linear' }, reduit ? 2 : 300)
-      lis.forEach((_, k) => tl.add(e2, { s2: [k, k + 1], duration: 1 }, reduit ? 3 + k : 700 + k * 1800))
-      tl.add(e2, { morph: [0, totalMorph], duration: d(Math.round((totalMorph / CPS) * 1.4)), ease: 'linear' }, reduit ? 10 : 10500)
+      tl.add(e2, { charge: [0, 1], duration: 2800, ease: 'linear' }, 300)
+      lis.forEach((_, k) => tl.add(e2, { s2: [k, k + 1], duration: 1 }, 700 + k * 1800))
+      tl.add(e2, { morph: [0, totalMorph], duration: Math.round((totalMorph / CPS) * 1.4), ease: 'linear' }, 10500)
       return tl
     }
-    const tl = createTimeline({ autoplay: false, onUpdate: rendu3 })
+    const tl = createTimeline({ autoplay: false, onUpdate: rendu3, onComplete: () => achever(3) })
     tl.add(e3, { trace: [0, 0], cartes: [0, 0], p: [0, 0], duration: 1 }, 0)
-    tl.add(e3, { trace: [0, 1], duration: d(1800), ease: 'inOutSine' }, reduit ? 2 : 200)
-    tl.add(e3, { cartes: [0, 3], duration: d(2400), ease: 'linear' }, reduit ? 3 : 900)
+    tl.add(e3, { trace: [0, 1], duration: 1800, ease: 'inOutSine' }, 200)
+    tl.add(e3, { cartes: [0, 3], duration: 2400, ease: 'linear' }, 900)
     // La tête de lecture balaie les 20 années à venir, à 600 ms par année.
-    tl.add(e3, { p: [0, 19], duration: d(19 * 600), ease: 'linear' }, reduit ? 4 : 2400)
+    tl.add(e3, { p: [0, 19], duration: 19 * 600, ease: 'linear' }, 2400)
     return tl
   }
 
@@ -380,22 +390,44 @@ export function monterMur(app) {
   const intros = {}
   let minuteur = null
   let fondu = null
+  let finFondu = -Infinity
+  let fonduEnCours = false
+  // M-1 (itération 2) : la rotation se replanifie à chaque changement ; les trois décors tournent en boucle.
   function planifier(ms) {
     arreter(minuteur)
-    minuteur = suivreA(createTimer({ duration: ms, onComplete: () => allerScene((sceneActive % 3) + 1) }))
+    minuteur = suivreA(createTimer({ duration: ms, onComplete: () => { allerScene((sceneActive % 3) + 1); planifier(DUREE_SCENE) } }))
+  }
+  // m-4 (itération 2) : un changement de décor attend la fin du fondu en cours, puis 1 s de décor stable.
+  async function attendreFondu() {
+    while (fonduEnCours) await attendre(50)
+    const reste = 1000 - (performance.now() - finFondu)
+    if (reste > 0) await attendre(reste)
+  }
+  // m-2 (itération 2) : quand une arrivée achève le décor 3 en plein balayage, le compteur de la tête s'efface,
+  // l'année finale est posée pendant qu'il est invisible, puis il revient.
+  function masquerTete() {
+    teteGelee = true
+    teteAnnee.classList.add('masquee')
+    suivreA(createTimer({ duration: 700, onComplete: () => { teteGelee = false; rendu3(); teteAnnee.classList.remove('masquee') } }))
   }
   function demarrerIntro(n, finir) {
+    const enCours = intros[n]
     arreter(intros[n])
+    intros[n] = null
+    if (finir || reduit) {
+      if (n === 3 && finir && enCours && !reduit) masquerTete()
+      achever(n)
+      return
+    }
     const tl = intro(n)
     intros[n] = tl
-    if (finir) { tl.seek(tl.duration); tl.cancel(); intros[n] = null; [rendu1, rendu2, rendu3][n - 1](); return }
     if (!enPause) tl.play()
     suivreA(tl)
   }
   // finir : pour une arrivée, le décor s'affiche déjà complet (le visiteur attend sa phrase, pas l'introduction).
   function allerScene(n, { finir = false } = {}) {
     if (n === sceneActive && opac['o' + n] > 0.99) {
-      if (finir && intros[n]) demarrerIntro(n, true)
+      if (finir && (intros[n] || reduit)) demarrerIntro(n, true)
       return Promise.resolve()
     }
     const ancienne = sceneActive
@@ -404,10 +436,11 @@ export function monterMur(app) {
     btnsScene.forEach((b) => b.setAttribute('aria-pressed', String(Number(b.dataset.aller) === n)))
     demarrerIntro(n, finir)
     arreter(fondu)
+    fonduEnCours = true
     fondu = suivreA(animeA(opac, {
       o1: n === 1 ? 1 : 0, o2: n === 2 ? 1 : 0, o3: n === 3 ? 1 : 0,
       duration: FONDU, ease: 'inOutSine', onUpdate: renduOpac,
-      onComplete: () => { if (ancienne !== n) arreter(intros[ancienne]) },
+      onComplete: () => { fonduEnCours = false; finFondu = performance.now(); if (ancienne !== n) arreter(intros[ancienne]) },
     }))
     return fini(fondu)
   }
@@ -424,7 +457,7 @@ export function monterMur(app) {
   }
   const ATTENTE = {
     1: ['en attente d’un vrai souvenir de 1976 à 1990', 'Le premier souvenir de ces années s’imprimera ici, dans le décor de son année.'],
-    2: ['Le livre d’or attend un vrai souvenir de 1991 à 2025.', 'Un souvenir vécu par vous, signé « un visiteur ».'],
+    2: ['Le livre d’or attend un vrai souvenir de 1991 à 2008.', 'Un souvenir vécu par vous, signé « un visiteur ».'],
     3: ['20 années à écrire. Le premier souhait de la journée s’inscrira ici, à son année.', 'Choisissez une année entre 2027 et 2046 : votre phrase y devient un point.'],
   }
   function rendreZone(k) {
@@ -472,7 +505,9 @@ export function monterMur(app) {
     li.dataset.simule = c.simule
     const k = decorDe(c.an)
     const vers = c.type === 'souvenir' ? `Souvenir de ${c.an}` : `Souhait pour ${c.an}`
-    li.innerHTML = `<p class="genre">${vers} → décor : ${DECORS[k].nom}</p><p class="texte"></p><p class="meta"><span class="cat">${esc(CATEGORIES[c.cat]?.fr || '')}</span><span class="badge">${c.simule === 'exemple' ? 'Exemple simulé' : 'Contribution de démo, simulée · effacée après la démo'}</span></p>`
+    if (k === 0) li.classList.add('sans-decor')
+    const dest = k === 0 ? 'reste au fil : pas de décor pour 2009-2025 dans le prototype' : `décor : ${DECORS[k].nom}`
+    li.innerHTML = `<p class="genre">${k === 0 ? `<span class="an-carte">${c.an}</span>` : ''}${vers} → ${dest}</p><p class="texte"></p><p class="meta"><span class="cat">${esc(CATEGORIES[c.cat]?.fr || '')}</span><span class="badge">${c.simule === 'exemple' ? 'Exemple simulé' : 'Contribution de démo, simulée · effacée après la démo'}</span></p>`
     li.querySelector('.texte').textContent = libelle(c) // un seul nœud texte : le vol lettre par lettre le mesure
     return li
   }
@@ -507,6 +542,8 @@ export function monterMur(app) {
   function ajouterCarte(c) {
     const vide = liste.querySelector('.fil-vide')
     if (vide) vide.remove()
+    // m-3 (itération 2) : la pastille « Matin du 18 novembre : aucune contribution » disparaît à la première arrivée.
+    if (contenu === 'vide') document.querySelector('.pastille-contenu')?.remove()
     const avant = new Map([...liste.children].map((el) => [el, rectMur(el)]))
     const li = carte(c)
     liste.prepend(li)
@@ -560,8 +597,19 @@ export function monterMur(app) {
     const k = v.k
     contributions.unshift(c)
     const li = ajouterCarte(c)
+    if (k === 0) {
+      // M-4 (itération 2) : un souvenir de 2009 à 2025 n'a pas de décor ; il reste au fil, marqué de son année.
+      await garde(v, attendre(reduit ? 600 : 1200))
+      if (v.annule) return
+      c.posee = true
+      voyages.delete(c.id)
+      li.classList.add('recue')
+      return
+    }
     arreter(minuteur) // le décor ne change plus pendant l'arrivée
     await garde(v, attendre(reduit ? 400 : 1000))
+    if (v.annule) return
+    await garde(v, attendreFondu())
     if (v.annule) return
     await garde(v, allerScene(k, { finir: true }))
     if (v.annule) return
@@ -657,6 +705,13 @@ export function monterMur(app) {
     v.noeuds.push(vol)
     const lettres = []
     const deltas = []
+    // m-5 (itération 2) : si la carte d'origine est hors cadre (vue recadrée sur les décors), les lettres partent
+    // du bord visible du cadre, décalées d'un bloc, au lieu d'entrer par le bord de l'écran.
+    const m0 = mur.getBoundingClientRect()
+    const bordVisible = (innerWidth - m0.left) / echelle - 80
+    const droite = Math.max(...srcs.map((s, i) => s.x + (srcs[i + 1] && srcs[i + 1].y === s.y ? srcs[i + 1].x - s.x : s.h * 0.6)))
+    const decalX = Math.min(0, bordVisible - droite)
+    srcs.forEach((s) => { s.x += decalX })
     srcs.forEach((s, i) => {
       if (!s.ch.trim() || !tgts[i]) return
       const sp = document.createElement('span')
@@ -693,7 +748,8 @@ export function monterMur(app) {
     const p = pointsEl.querySelector(`[data-id="${CSS.escape(c.id)}"]`)
     if (!p) return
     if (reduit) { suivreA(animeA(p, { opacity: [0, 1], duration: 600 })); return }
-    suivreM(animeM(p, { scale: [0, 1] }, { type: 'spring', stiffness: 260, damping: 11 }))
+    effacerTrait()
+    const ressort = suivreM(animeM(p, { scale: [0, 1] }, { type: 'spring', stiffness: 260, damping: 11 }))
     // Le trait qui relie la phrase à son année se trace (createDrawable), puis s'efface.
     const lien = document.getElementById('lien-point')
     const futur = document.getElementById('futur')
@@ -707,10 +763,19 @@ export function monterMur(app) {
     lien.setAttribute('d', `M${x0} ${y0} C ${x0} ${(y0 + y1) / 2}, ${x1} ${(y0 + y1) / 2}, ${x1} ${y1}`)
     lien.style.opacity = 1
     const [dessin] = svg.createDrawable(lien)
-    const tl = createTimeline({ autoplay: true })
+    const tl = createTimeline({ autoplay: !enPause })
     tl.add(dessin, { draw: ['0 0', '0 1'], duration: 900, ease: 'inOutSine' })
       .add(lien, { opacity: [1, 0], duration: 800 }, '+=3500')
     suivreA(tl)
+    trait = { id: c.id, anims: [ressort, tl] }
+  }
+  // m-1 (itération 2) : le trait et le ressort du point sont rattachés à l'identifiant ; un retrait les efface.
+  let trait = null
+  function effacerTrait(id) {
+    if (!trait || (id && trait.id !== id)) return
+    trait.anims.forEach(arreter)
+    trait = null
+    document.getElementById('lien-point').style.opacity = 0
   }
 
   // ---------- Retrait : retirer prime sur tout, même en pause, même en plein vol ----------
@@ -737,6 +802,7 @@ export function monterMur(app) {
     const i = contributions.findIndex((c) => c.id === id)
     if (i >= 0) { contributions.splice(i, 1); trouve = true }
     if (vedette3 === id) vedette3 = null
+    effacerTrait(id)
     canalMur.postMessage({ type: trouve ? 'retiree' : 'inconnu', id })
     if (!trouve) return
     rendreFil()

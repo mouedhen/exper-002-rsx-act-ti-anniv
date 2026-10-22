@@ -286,3 +286,8 @@ body.vue-formulaire { background: #eef1f6; color: #111827; font: 16px/1.45 var(-
 .statut p { margin: 0 0 8px; }
 .retrait-code summary { font-weight: 700; cursor: pointer; min-height: 32px; }
 .etat-code { font-weight: 600; margin: 6px 0 0; }
+
+/* Itération 2 (équipe rouge combi 1) */
+.tete-annee { transition: opacity .3s linear; }
+.tete-annee.masquee { opacity: 0; }
+.carte-contrib .an-carte { display: inline-block; margin-right: 18px; padding: 2px 22px; border: 3px solid var(--badge); border-radius: 999px; font-weight: 700; color: var(--badge); }

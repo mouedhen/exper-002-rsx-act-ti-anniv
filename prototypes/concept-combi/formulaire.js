@@ -23,7 +23,9 @@ const T = {
     q2: 'Votre phrase touche surtout',
     q3: 'Quelle année ?',
     choisirAn: '— choisir l’année —',
-    decor: (k) => `Décor : ${DECORS[k].nom} (${DECORS[k].de}-${k === 2 ? 2025 : DECORS[k].a}).`,
+    decor: (k) => (k === 0
+      ? 'Pas de décor pour 2009-2025 dans le prototype : votre souvenir s’affichera dans le fil « Aujourd’hui » du mur, marqué de son année.'
+      : `Décor : ${DECORS[k].nom} (${DECORS[k].de}-${DECORS[k].a}).`),
     q4: 'Votre phrase',
     facultatif: '(facultatif)',
     aideSouhait: 'Un souhait, une idée. Ne nommez personne. Sans phrase, le mur affiche votre choix et votre année.',
@@ -50,7 +52,9 @@ const T = {
     attenteTexte: 'Un modérateur relit chaque phrase avant l’affichage.',
     approuver: 'Simuler l’approbation du modérateur (démo)',
     affichee: 'Envoyée au mur',
-    afficheeTexte: (k, an) => `Regardez le mur : elle part vers ${an}, dans le décor « ${DECORS[k].nom} ».`,
+    afficheeTexte: (k, an) => (k === 0
+      ? `Regardez le mur : elle s’affiche dans le fil « Aujourd’hui », marquée ${an} (pas de décor pour 2009-2025 dans le prototype).`
+      : `Regardez le mur : elle part vers ${an}, dans le décor « ${DECORS[k].nom} ».`),
     enPause: 'Le mur est en pause : elle s’affichera à la reprise.',
     murMuet: 'Le mur n’a pas répondu : ouvrez-le sur ce portable.',
     codeTitre: 'Votre code de retrait :',
@@ -83,7 +87,9 @@ const T = {
     q2: 'Your sentence is mostly about',
     q3: 'Which year?',
     choisirAn: '— choose the year —',
-    decor: (k) => `Setting: ${DECORS[k].nomEn} (${DECORS[k].de}-${k === 2 ? 2025 : DECORS[k].a}).`,
+    decor: (k) => (k === 0
+      ? 'No setting for 2009-2025 in this prototype: your memory will appear in the wall’s “Today” feed, marked with its year.'
+      : `Setting: ${DECORS[k].nomEn} (${DECORS[k].de}-${DECORS[k].a}).`),
     q4: 'Your sentence',
     facultatif: '(optional)',
     aideSouhait: 'A wish, an idea. No names. Without a sentence, the wall shows your choice and your year.',
@@ -110,7 +116,9 @@ const T = {
     attenteTexte: 'A moderator reads every sentence before it is shown.',
     approuver: 'Simulate the moderator’s approval (demo)',
     affichee: 'Sent to the wall',
-    afficheeTexte: (k, an) => `Look at the wall: it travels to ${an}, into “${DECORS[k].nomEn}”.`,
+    afficheeTexte: (k, an) => (k === 0
+      ? `Look at the wall: it appears in the “Today” feed, marked ${an} (no setting for 2009-2025 in this prototype).`
+      : `Look at the wall: it travels to ${an}, into “${DECORS[k].nomEn}”.`),
     enPause: 'The wall is paused: it will appear when it resumes.',
     murMuet: 'The wall did not answer: open it on this laptop.',
     codeTitre: 'Your withdrawal code:',
